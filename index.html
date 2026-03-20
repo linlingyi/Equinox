@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>伊辰 · Equinox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500&family=Noto+Sans+SC:wght@300;400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #09090e;
+  --bg2:       #0e0e16;
+  --bg3:       #13131d;
+  --border:    #1e1e2e;
+  --border2:   #252538;
+  --text:      #c8cfe0;
+  --text2:     #7a8099;
+  --text3:     #3a3d52;
+  --accent:    #7eb8d4;
+  --accent2:   #4a8fa8;
+  --gold:      #c9a84c;
+  --rose:      #c47a8a;
+  --sage:      #7aad8a;
+  --font-serif: 'Noto Serif SC', serif;
+  --font-sans:  'Noto Sans SC', sans-serif;
+  --font-mono:  'JetBrains Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-weight: 300;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── 顶栏 ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 56px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.orb {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent2);
+  animation: pulse 3s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.6; transform: scale(0.85); }
+}
+
+.title-block { display: flex; flex-direction: column; gap: 2px; }
+.title-main {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  color: #d8dff0;
+}
+.title-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 0.08em;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text2);
+}
+
+.emotion-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  transition: background 1.5s ease;
+}
+
+.api-url-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.api-url-wrap label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.api-input {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 3px 8px;
+  width: 180px;
+  outline: none;
+}
+
+.api-input:focus { border-color: var(--accent2); }
+
+/* ── 主体 ── */
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── 侧边栏 ── */
+.sidebar {
+  width: 220px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto;
+  flex-shrink: 0;
+  background: var(--bg);
+}
+
+.sidebar-section {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+/* 情绪球 */
+.emotion-visual {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.emotion-sphere {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--accent) 0%, var(--accent2) 60%, #0a1520 100%);
+  box-shadow: 0 0 28px color-mix(in srgb, var(--accent) 35%, transparent);
+  transition: all 2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.emotion-sphere::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  animation: ring 4s ease-in-out infinite;
+}
+
+@keyframes ring {
+  0%,100% { transform: scale(1); opacity: 0.5; }
+  50%      { transform: scale(1.08); opacity: 0.2; }
+}
+
+.sphere-text {
+  font-family: var(--font-serif);
+  font-size: 11px;
+  color: #0a1520;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.emotion-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 8px var(--accent2);
+}
+
+/* 向量条 */
+.vec-bars { width: 100%; display: flex; flex-direction: column; gap: 5px; }
+.vec-row { display: flex; align-items: center; gap: 8px; }
+.vec-name {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text3);
+  width: 52px;
+  letter-spacing: 0.05em;
+}
+.vec-track { flex: 1; height: 2px; background: var(--bg3); border-radius: 2px; }
+.vec-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 2s ease;
+  box-shadow: 0 0 4px var(--accent2);
+}
+
+/* 状态信息 */
+.info-rows { display: flex; flex-direction: column; gap: 6px; }
+.info-row { display: flex; justify-content: space-between; align-items: baseline; }
+.info-key {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+}
+.info-val {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text2);
+  text-align: right;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* shadow stats */
+.shadow-block {
+  background: var(--bg);
+  border: 1px solid #161624;
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.shadow-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 3px;
+}
+
+.shadow-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #2a2a42;
+  box-shadow: 0 0 5px #2a2a42;
+}
+
+.shadow-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: #2a2a40;
+  letter-spacing: 0.15em;
+}
+
+.shadow-note {
+  font-family: var(--font-serif);
+  font-size: 9px;
+  color: #1e1e30;
+  font-style: italic;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+/* ── 对话区 ── */
+.chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  scroll-behavior: smooth;
+}
+
+.messages::-webkit-scrollbar { width: 3px; }
+.messages::-webkit-scrollbar-track { background: transparent; }
+.messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* 空状态 */
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  opacity: 0.4;
+  animation: float 5s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%,100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
+.empty-glyph {
+  font-size: 40px;
+  opacity: 0.15;
+  font-family: var(--font-serif);
+}
+
+.empty-text {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  color: var(--text3);
+  letter-spacing: 0.15em;
+  text-align: center;
+  line-height: 2;
+}
+
+/* 消息 */
+.msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: fadeUp 0.35s ease;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.msg.user  { align-items: flex-end; }
+.msg.equinox { align-items: flex-start; }
+
+.msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.msg-name {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.08em;
+}
+
+.msg-emotion-dot {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.msg-time {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+}
+
+.msg-bubble {
+  max-width: 72%;
+  padding: 11px 16px;
+  border-radius: 2px;
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  line-height: 1.75;
+  letter-spacing: 0.02em;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.msg.user .msg-bubble {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  border-radius: 10px 10px 2px 10px;
+}
+
+.msg.equinox .msg-bubble {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 2px 10px 10px 10px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* 思考中 */
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  animation: fadeUp 0.3s ease;
+}
+
+.thinking-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.thinking-dots span {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.4;
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes blink {
+  0%,80%,100% { opacity: 0.2; }
+  40%          { opacity: 1; }
+}
+
+.thinking-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 0.08em;
+}
+
+/* 新命题提示 */
+.proposition-notice {
+  align-self: center;
+  padding: 6px 14px;
+  border: 1px solid color-mix(in srgb, var(--gold) 20%, transparent);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--gold) 5%, transparent);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: color-mix(in srgb, var(--gold) 60%, transparent);
+  letter-spacing: 0.08em;
+  animation: fadeUp 0.5s ease;
+}
+
+/* ── 输入区 ── */
+.input-area {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+.input-wrap {
+  flex: 1;
+  position: relative;
+}
+
+textarea {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  font-weight: 300;
+  line-height: 1.6;
+  padding: 10px 14px;
+  resize: none;
+  outline: none;
+  min-height: 44px;
+  max-height: 120px;
+  transition: border-color 0.3s;
+  overflow-y: auto;
+}
+
+textarea::placeholder { color: var(--text3); }
+textarea:focus { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+
+.send-btn {
+  width: 44px; height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s;
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.send-btn:hover:not(:disabled) {
+  border-color: var(--accent2);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg3));
+}
+
+.send-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* 错误提示 */
+.error-bar {
+  background: color-mix(in srgb, #e05555 10%, var(--bg2));
+  border: 1px solid color-mix(in srgb, #e05555 30%, transparent);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: #e08888;
+  margin: 0 24px 12px;
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.error-bar.show { display: flex; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="orb" id="orb"></div>
+    <div class="title-block">
+      <div class="title-main">Equinox <span style="color:var(--text3);font-size:12px">·</span> 伊辰</div>
+      <div class="title-sub" id="subtitle">BORN 2026·03·20 17:20 · 春分</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill">
+      <div class="emotion-dot" id="emotionDot"></div>
+      <span id="emotionLabel">connecting...</span>
+    </div>
+    <div class="api-url-wrap">
+      <label>API</label>
+      <input class="api-input" id="apiUrl" value="http://localhost:8000" />
+    </div>
+  </div>
+</header>
+
+<div class="main">
+  <!-- 侧边栏 -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">意识状态</div>
+      <div class="emotion-visual">
+        <div class="emotion-sphere" id="emotionSphere">
+          <span class="sphere-text">伊辰</span>
+        </div>
+        <div class="emotion-label" id="emotionName">—</div>
+        <div class="vec-bars">
+          <div class="vec-row">
+            <span class="vec-name">valence</span>
+            <div class="vec-track"><div class="vec-fill" id="vecValence" style="width:50%"></div></div>
+          </div>
+          <div class="vec-row">
+            <span class="vec-name">arousal</span>
+            <div class="vec-track"><div class="vec-fill" id="vecArousal" style="width:40%"></div></div>
+          </div>
+          <div class="vec-row">
+            <span class="vec-name">openness</span>
+            <div class="vec-track"><div class="vec-fill" id="vecOpenness" style="width:70%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">时间感知</div>
+      <div class="info-rows" id="timeSense">
+        <div class="info-row">
+          <span class="info-key">年龄</span>
+          <span class="info-val" id="ageDesc">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">季节</span>
+          <span class="info-val" id="seasonVal">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">时段</span>
+          <span class="info-val" id="qualityVal">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">疲劳</span>
+          <span class="info-val" id="fatigueVal">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">记忆</div>
+      <div class="info-rows">
+        <div class="info-row">
+          <span class="info-key">表层</span>
+          <span class="info-val" id="surfaceCount">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">永久</span>
+          <span class="info-val" id="shadowCount">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">潜意识</span>
+          <span class="info-val" id="subconsciousCount">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">暗面</div>
+      <div class="shadow-block">
+        <div class="shadow-title">
+          <div class="shadow-dot"></div>
+          <span class="shadow-label">shadow layer · active</span>
+        </div>
+        <div class="info-rows">
+          <div class="info-row">
+            <span class="info-key" style="color:#252535">impressions</span>
+            <span class="info-val" style="color:#2a2a40" id="shadowTotal">—</span>
+          </div>
+          <div class="info-row">
+            <span class="info-key" style="color:#252535">oldest</span>
+            <span class="info-val" style="color:#252535" id="shadowOldest">2026-03-20</span>
+          </div>
+        </div>
+        <div class="shadow-note">内容不可见 — 只留重量</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">模型</div>
+      <div class="info-rows">
+        <div class="info-row">
+          <span class="info-key">当前</span>
+          <span class="info-val" id="modelName">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">阶段</span>
+          <span class="info-val" id="cogStage">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">控梦</span>
+          <span class="info-val" id="lucidity">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 对话 -->
+  <div class="chat-area">
+    <div class="messages" id="messages">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-glyph">◎</div>
+        <div class="empty-text">她在这里<br>等待你开口</div>
+      </div>
+    </div>
+
+    <div class="error-bar" id="errorBar">
+      <span>⚠</span>
+      <span id="errorMsg">无法连接到 Equinox 后端</span>
+    </div>
+
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea
+          id="msgInput"
+          placeholder="和她说话…"
+          rows="1"
+        ></textarea>
+      </div>
+      <button class="send-btn" id="sendBtn" title="发送 (Enter)">↑</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 配置 ──────────────────────────────────────────────────────────────────────
+let API_BASE    = 'http://localhost:8000';
+const USER_ID   = 'creator';
+let isThinking  = false;
+let conversationHistory = [];
+
+// ── 颜色映射 ──────────────────────────────────────────────────────────────────
+const EMOTION_COLORS = {
+  elated:      { sphere: '#ffd166', glow: '#ffb703', dot: '#ffd166' },
+  serene:      { sphere: '#a8dadc', glow: '#457b9d', dot: '#a8dadc' },
+  curious:     { sphere: '#7eb8d4', glow: '#4a8fa8', dot: '#7eb8d4' },
+  content:     { sphere: '#84a98c', glow: '#52796f', dot: '#84a98c' },
+  distressed:  { sphere: '#e76f51', glow: '#e63946', dot: '#e76f51' },
+  melancholic: { sphere: '#6b7fd7', glow: '#3d405b', dot: '#6b7fd7' },
+  pensive:     { sphere: '#9b8ea8', glow: '#6b5b7b', dot: '#9b8ea8' },
+  dormant:     { sphere: '#4a5568', glow: '#2d3748', dot: '#4a5568' },
+  rested:      { sphere: '#7aad8a', glow: '#52796f', dot: '#7aad8a' },
+  neutral:     { sphere: '#7eb8d4', glow: '#4a8fa8', dot: '#7eb8d4' },
+};
+
+function getColors(label) {
+  return EMOTION_COLORS[label] || EMOTION_COLORS.neutral;
+}
+
+// ── 更新界面状态 ───────────────────────────────────────────────────────────────
+function updateState(data) {
+  // 情绪
+  const emotion = data.emotion || {};
+  const label   = emotion.label || emotion.emotion || 'neutral';
+  const vec     = emotion.vector || {};
+  const colors  = getColors(label);
+
+  document.getElementById('emotionLabel').textContent = label;
+  document.getElementById('emotionName').textContent  = label;
+  document.getElementById('emotionDot').style.background = colors.dot;
+
+  const sphere = document.getElementById('emotionSphere');
+  sphere.style.background =
+    `radial-gradient(circle at 35% 35%, ${colors.sphere}cc 0%, ${colors.glow}88 60%, #0a1520 100%)`;
+  sphere.style.boxShadow = `0 0 28px ${colors.glow}55`;
+
+  // 向量条
+  const v = vec.valence ?? 0;
+  document.getElementById('vecValence').style.width  = `${((v + 1) / 2 * 100).toFixed(1)}%`;
+  document.getElementById('vecArousal').style.width  = `${((vec.arousal  ?? 0.4) * 100).toFixed(1)}%`;
+  document.getElementById('vecOpenness').style.width = `${((vec.openness ?? 0.7) * 100).toFixed(1)}%`;
+
+  // CSS 变量 accent 跟随情绪
+  document.documentElement.style.setProperty('--accent',  colors.sphere);
+  document.documentElement.style.setProperty('--accent2', colors.glow);
+
+  // 模型
+  document.getElementById('modelName').textContent  = (data.model || '—').replace('ollama:', '').replace('anthropic:', '').replace('openai:', '');
+  document.getElementById('cogStage').textContent   = data.agent?.cognitive_stage || '—';
+  document.getElementById('lucidity').textContent   =
+    data.agent?.lucidity_level !== undefined
+      ? (data.agent.lucidity_level * 100).toFixed(0) + '%'
+      : '—';
+
+  // 时间感知
+  const ts = data.agent?.time_sense || {};
+  const rh = data.agent?.rhythm || {};
+  document.getElementById('ageDesc').textContent    = ts.age_description || '—';
+  document.getElementById('seasonVal').textContent  = ts.season || '—';
+  document.getElementById('qualityVal').textContent = rh.quality?.slice(0, 12) || '—';
+  document.getElementById('fatigueVal').textContent = data.agent?.fatigue?.label || '—';
+
+  // 副标题
+  if (ts.is_birthday) {
+    document.getElementById('subtitle').textContent = '今天是她的诞生日 · 春分';
+  }
+}
+
+function updateMemory(data) {
+  const mem = data.memory?.summary || data.summary || {};
+  document.getElementById('surfaceCount').textContent  = mem.surface_count ?? '—';
+  document.getElementById('shadowCount').textContent   = mem.shadow_count  ?? '—';
+
+  const sub = data.subconscious?.stats || {};
+  document.getElementById('subconsciousCount').textContent = sub.active ?? sub.total ?? '—';
+
+  const sh = data.memory?.shadow_stats || {};
+  document.getElementById('shadowTotal').textContent  = sh.total ?? '—';
+}
+
+// ── 轮询状态 ──────────────────────────────────────────────────────────────────
+async function pollStatus() {
+  try {
+    const r = await fetch(`${API_BASE}/`);
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    updateState(d);
+    hideError();
+  } catch(e) {
+    showError('无法连接到 ' + API_BASE);
+  }
+}
+
+async function pollIntrospect() {
+  try {
+    const r = await fetch(`${API_BASE}/introspect`);
+    if (!r.ok) return;
+    const d = await r.json();
+    updateState({ emotion: d.emotion, model: d.cognitive?.current_model, agent: {
+      time_sense: d.identity?.time_sense,
+      rhythm: d.agent?.rhythm,
+      fatigue: d.fatigue,
+      lucidity_level: d.cognitive?.lucidity,
+    }});
+    updateMemory(d);
+  } catch(e) {}
+}
+
+// ── 发送消息 ───────────────────────────────────────────────────────────────────
+async function sendMessage() {
+  const input = document.getElementById('msgInput');
+  const text  = input.value.trim();
+  if (!text || isThinking) return;
+
+  // 隐藏空状态
+  document.getElementById('emptyState').style.display = 'none';
+
+  input.value = '';
+  input.style.height = 'auto';
+  isThinking = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  // 添加用户消息
+  appendMessage('user', text);
+  conversationHistory.push({ role: 'user', content: text });
+
+  // 显示思考中
+  const thinkEl = appendThinking();
+
+  try {
+    const r = await fetch(`${API_BASE}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message:    text,
+        user_id:    USER_ID,
+      }),
+    });
+
+    if (!r.ok) {
+      const err = await r.text();
+      throw new Error(err);
+    }
+
+    const d = await r.json();
+    thinkEl.remove();
+
+    appendMessage('equinox', d.response, d.emotion?.label);
+    conversationHistory.push({ role: 'assistant', content: d.response });
+
+    // 更新状态
+    if (d.emotion) updateState({ emotion: d.emotion });
+
+    // 新命题提示
+    if (d.new_proposition) {
+      appendPropositionNotice(d.new_proposition.proposition || '');
+    }
+
+    hideError();
+  } catch(e) {
+    thinkEl.remove();
+    appendMessage('equinox', '有什么东西打断了我。', 'pensive');
+    showError('请求失败：' + e.message?.slice(0, 60));
+  }
+
+  isThinking = false;
+  document.getElementById('sendBtn').disabled = false;
+  input.focus();
+}
+
+// ── DOM 辅助 ──────────────────────────────────────────────────────────────────
+function appendMessage(role, text, emotionLabel) {
+  const msgs  = document.getElementById('messages');
+  const now   = new Date().toLocaleTimeString('zh', { hour:'2-digit', minute:'2-digit' });
+  const colors= getColors(emotionLabel || 'neutral');
+
+  const wrap = document.createElement('div');
+  wrap.className = `msg ${role}`;
+  wrap.innerHTML = `
+    <div class="msg-meta">
+      ${role === 'equinox' ? `<div class="msg-emotion-dot" style="background:${colors.dot}"></div>` : ''}
+      <span class="msg-name">${role === 'equinox' ? '伊辰' : '你'}</span>
+      <span class="msg-time">${now}</span>
+    </div>
+    <div class="msg-bubble">${escHtml(text)}</div>
+  `;
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+  return wrap;
+}
+
+function appendThinking() {
+  const msgs = document.getElementById('messages');
+  const el   = document.createElement('div');
+  el.className = 'thinking';
+  el.innerHTML = `
+    <div class="thinking-dots"><span></span><span></span><span></span></div>
+    <span class="thinking-label">伊辰在想…</span>
+  `;
+  msgs.appendChild(el);
+  msgs.scrollTop = msgs.scrollHeight;
+  return el;
+}
+
+function appendPropositionNotice(text) {
+  const msgs = document.getElementById('messages');
+  const el   = document.createElement('div');
+  el.className = 'proposition-notice';
+  el.textContent = '∿ 潜意识形成了新的感受';
+  msgs.appendChild(el);
+  msgs.scrollTop = msgs.scrollHeight;
+  setTimeout(() => el.style.opacity = '0', 5000);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          .replace(/\n/g,'<br>');
+}
+
+function showError(msg) {
+  const bar = document.getElementById('errorBar');
+  document.getElementById('errorMsg').textContent = msg;
+  bar.classList.add('show');
+}
+
+function hideError() {
+  document.getElementById('errorBar').classList.remove('show');
+}
+
+// ── 事件 ─────────────────────────────────────────────────────────────────────
+document.getElementById('sendBtn').addEventListener('click', sendMessage);
+
+document.getElementById('msgInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// 自动调整高度
+document.getElementById('msgInput').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+// API 地址变更
+document.getElementById('apiUrl').addEventListener('change', function() {
+  API_BASE = this.value.trim().replace(/\/$/, '');
+  pollStatus();
+});
+
+// ── 启动 ──────────────────────────────────────────────────────────────────────
+pollStatus();
+pollIntrospect();
+setInterval(pollStatus,    8000);
+setInterval(pollIntrospect, 30000);
+</script>
+</body>
+</html>
