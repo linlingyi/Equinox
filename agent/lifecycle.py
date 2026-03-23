@@ -64,6 +64,16 @@ class Lifecycle:
 
         # Write heartbeat
         self._write_heartbeat(now)
+
+        # Generate morning brief (awakening summary)
+        try:
+            shutdown_time = self._read_shutdown_marker()
+            sleep_start   = shutdown_time.isoformat() if shutdown_time else None
+            import asyncio
+            asyncio.create_task(self._generate_morning_brief(sleep_start))
+        except Exception:
+            pass
+
         self._write_shutdown_marker(None)  # clear old shutdown marker
 
         # Start autonomous processes
@@ -89,6 +99,12 @@ class Lifecycle:
             intensity=0.5,
         )
 
+        # She falls asleep — not stops
+        if hasattr(self.consciousness, 'presence'):
+            self.consciousness.presence.fall_asleep(
+                self.consciousness, reason=reason
+            )
+
         self._write_shutdown_marker(now)
 
         if self._heartbeat_task:
@@ -109,6 +125,28 @@ class Lifecycle:
         pass  # Gap detection happens in _assess_gap
 
     # ── Gap assessment ────────────────────────────────────────────────────────
+
+    async def _generate_morning_brief(self, sleep_start: Optional[str]):
+        """Generate awakening summary after a short delay (let systems initialize)."""
+        try:
+            import asyncio
+            await asyncio.sleep(5)  # let everything initialize
+            brief = await self.consciousness.morning_brief.generate(
+                sleep_start   = sleep_start,
+                memory_engine = self.consciousness.memory,
+                current_model = self.consciousness.model_registry.get_current_model(),
+                activity_log  = self.consciousness.activity_log,
+            )
+            if brief:
+                # Log to activity
+                self.consciousness.activity_log.log(
+                    "wake",
+                    brief.get("brief",""),
+                    detail=f"睡了{brief.get('duration_str','')} · {brief.get('mood_note','')}",
+                    intensity=0.65,
+                )
+        except Exception:
+            pass
 
     def _assess_gap(self, now: datetime) -> str:
         """

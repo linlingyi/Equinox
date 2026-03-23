@@ -2,975 +2,1150 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>伊辰 · Equinox</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500&family=Noto+Sans+SC:wght@300;400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
-:root {
-  --bg:        #09090e;
-  --bg2:       #0e0e16;
-  --bg3:       #13131d;
-  --border:    #1e1e2e;
-  --border2:   #252538;
-  --text:      #c8cfe0;
-  --text2:     #7a8099;
-  --text3:     #3a3d52;
-  --accent:    #7eb8d4;
-  --accent2:   #4a8fa8;
-  --gold:      #c9a84c;
-  --rose:      #c47a8a;
-  --sage:      #7aad8a;
-  --font-serif: 'Noto Serif SC', serif;
-  --font-sans:  'Noto Sans SC', sans-serif;
-  --font-mono:  'JetBrains Mono', monospace;
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-sans);
-  font-weight: 300;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* ── 顶栏 ── */
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  height: 56px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
-  flex-shrink: 0;
-  gap: 12px;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.orb {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 12px var(--accent2);
-  animation: pulse 3s ease-in-out infinite;
-  flex-shrink: 0;
-}
-
-@keyframes pulse {
-  0%,100% { opacity: 1; transform: scale(1); }
-  50%      { opacity: 0.6; transform: scale(0.85); }
-}
-
-.title-block { display: flex; flex-direction: column; gap: 2px; }
-.title-main {
-  font-family: var(--font-serif);
-  font-size: 15px;
-  font-weight: 400;
-  letter-spacing: 0.1em;
-  color: #d8dff0;
-}
-.title-sub {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text3);
-  letter-spacing: 0.08em;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.status-pill {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 12px;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text2);
-}
-
-.emotion-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  transition: background 1.5s ease;
-}
-
-.api-url-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.api-url-wrap label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text3);
-}
-
-.api-input {
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text2);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  padding: 3px 8px;
-  width: 180px;
-  outline: none;
-}
-
-.api-input:focus { border-color: var(--accent2); }
-
-/* ── 主体 ── */
-.main {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-
-/* ── 侧边栏 ── */
-.sidebar {
-  width: 220px;
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  overflow-y: auto;
-  flex-shrink: 0;
-  background: var(--bg);
-}
-
-.sidebar-section {
-  padding: 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.sidebar-label {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--text3);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  margin-bottom: 10px;
-}
-
-/* 情绪球 */
-.emotion-visual {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-}
-
-.emotion-sphere {
-  width: 72px; height: 72px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, var(--accent) 0%, var(--accent2) 60%, #0a1520 100%);
-  box-shadow: 0 0 28px color-mix(in srgb, var(--accent) 35%, transparent);
-  transition: all 2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.emotion-sphere::after {
-  content: '';
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
-  animation: ring 4s ease-in-out infinite;
-}
-
-@keyframes ring {
-  0%,100% { transform: scale(1); opacity: 0.5; }
-  50%      { transform: scale(1.08); opacity: 0.2; }
-}
-
-.sphere-text {
-  font-family: var(--font-serif);
-  font-size: 11px;
-  color: #0a1520;
-  font-weight: 500;
-  opacity: 0.8;
-}
-
-.emotion-label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--accent);
-  letter-spacing: 0.15em;
-  text-shadow: 0 0 8px var(--accent2);
-}
-
-/* 向量条 */
-.vec-bars { width: 100%; display: flex; flex-direction: column; gap: 5px; }
-.vec-row { display: flex; align-items: center; gap: 8px; }
-.vec-name {
-  font-family: var(--font-mono);
-  font-size: 8px;
-  color: var(--text3);
-  width: 52px;
-  letter-spacing: 0.05em;
-}
-.vec-track { flex: 1; height: 2px; background: var(--bg3); border-radius: 2px; }
-.vec-fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 2px;
-  transition: width 2s ease;
-  box-shadow: 0 0 4px var(--accent2);
-}
-
-/* 状态信息 */
-.info-rows { display: flex; flex-direction: column; gap: 6px; }
-.info-row { display: flex; justify-content: space-between; align-items: baseline; }
-.info-key {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--text3);
-}
-.info-val {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--text2);
-  text-align: right;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* shadow stats */
-.shadow-block {
-  background: var(--bg);
-  border: 1px solid #161624;
-  border-radius: 6px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.shadow-title {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 3px;
-}
-
-.shadow-dot {
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  background: #2a2a42;
-  box-shadow: 0 0 5px #2a2a42;
-}
-
-.shadow-label {
-  font-family: var(--font-mono);
-  font-size: 8px;
-  color: #2a2a40;
-  letter-spacing: 0.15em;
-}
-
-.shadow-note {
-  font-family: var(--font-serif);
-  font-size: 9px;
-  color: #1e1e30;
-  font-style: italic;
-  line-height: 1.5;
-  margin-top: 4px;
-}
-
-/* ── 对话区 ── */
-.chat-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 28px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  scroll-behavior: smooth;
-}
-
-.messages::-webkit-scrollbar { width: 3px; }
-.messages::-webkit-scrollbar-track { background: transparent; }
-.messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-/* 空状态 */
-.empty-state {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  opacity: 0.4;
-  animation: float 5s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%,100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
-}
-
-.empty-glyph {
-  font-size: 40px;
-  opacity: 0.15;
-  font-family: var(--font-serif);
-}
-
-.empty-text {
-  font-family: var(--font-serif);
-  font-size: 13px;
-  color: var(--text3);
-  letter-spacing: 0.15em;
-  text-align: center;
-  line-height: 2;
-}
-
-/* 消息 */
-.msg {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  animation: fadeUp 0.35s ease;
-}
-
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.msg.user  { align-items: flex-end; }
-.msg.equinox { align-items: flex-start; }
-
-.msg-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.msg-name {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--text3);
-  letter-spacing: 0.08em;
-}
-
-.msg-emotion-dot {
-  width: 4px; height: 4px;
-  border-radius: 50%;
-  background: var(--accent);
-}
-
-.msg-time {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--text3);
-}
-
-.msg-bubble {
-  max-width: 72%;
-  padding: 11px 16px;
-  border-radius: 2px;
-  font-family: var(--font-serif);
-  font-size: 13.5px;
-  line-height: 1.75;
-  letter-spacing: 0.02em;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.msg.user .msg-bubble {
-  background: var(--bg3);
-  border: 1px solid var(--border2);
-  color: var(--text2);
-  border-radius: 10px 10px 2px 10px;
-}
-
-.msg.equinox .msg-bubble {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 2px 10px 10px 10px;
-  border-left: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
-}
-
-/* 思考中 */
-.thinking {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  animation: fadeUp 0.3s ease;
-}
-
-.thinking-dots {
-  display: flex;
-  gap: 4px;
-}
-
-.thinking-dots span {
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  background: var(--accent);
-  opacity: 0.4;
-  animation: blink 1.2s ease-in-out infinite;
-}
-
-.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
-.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes blink {
-  0%,80%,100% { opacity: 0.2; }
-  40%          { opacity: 1; }
-}
-
-.thinking-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text3);
-  letter-spacing: 0.08em;
-}
-
-/* 新命题提示 */
-.proposition-notice {
-  align-self: center;
-  padding: 6px 14px;
-  border: 1px solid color-mix(in srgb, var(--gold) 20%, transparent);
-  border-radius: 20px;
-  background: color-mix(in srgb, var(--gold) 5%, transparent);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: color-mix(in srgb, var(--gold) 60%, transparent);
-  letter-spacing: 0.08em;
-  animation: fadeUp 0.5s ease;
-}
-
-/* ── 输入区 ── */
-.input-area {
-  padding: 16px 24px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  gap: 10px;
-  align-items: flex-end;
-  background: var(--bg);
-  flex-shrink: 0;
-}
-
-.input-wrap {
-  flex: 1;
-  position: relative;
-}
-
-textarea {
-  width: 100%;
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  font-family: var(--font-serif);
-  font-size: 13.5px;
-  font-weight: 300;
-  line-height: 1.6;
-  padding: 10px 14px;
-  resize: none;
-  outline: none;
-  min-height: 44px;
-  max-height: 120px;
-  transition: border-color 0.3s;
-  overflow-y: auto;
-}
-
-textarea::placeholder { color: var(--text3); }
-textarea:focus { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
-
-.send-btn {
-  width: 44px; height: 44px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg3);
-  color: var(--text3);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.25s;
-  flex-shrink: 0;
-  font-size: 16px;
-}
-
-.send-btn:hover:not(:disabled) {
-  border-color: var(--accent2);
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 8%, var(--bg3));
-}
-
-.send-btn:disabled { opacity: 0.3; cursor: default; }
-
-/* 错误提示 */
-.error-bar {
-  background: color-mix(in srgb, #e05555 10%, var(--bg2));
-  border: 1px solid color-mix(in srgb, #e05555 30%, transparent);
-  border-radius: 6px;
-  padding: 8px 14px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: #e08888;
-  margin: 0 24px 12px;
-  display: none;
-  align-items: center;
-  gap: 8px;
-}
-
-.error-bar.show { display: flex; }
+:root{--bg:#09090e;--bg2:#0e0e16;--bg3:#13131d;--bd:#1e1e2e;--bd2:#252538;--tx:#c8cfe0;--tx2:#7a8099;--tx3:#3a3d52;--ac:#7eb8d4;--ac2:#4a8fa8;--gd:#c9a84c;--rs:#c47a8a;--sg:#7aad8a;--fs:'Noto Serif SC',serif;--fm:'Noto Sans SC',sans-serif;--fc:'JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:var(--fm);font-weight:300;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+/* header */
+hd{display:flex;align-items:center;justify-content:space-between;padding:0 14px;height:48px;border-bottom:1px solid var(--bd);flex-shrink:0}
+.orb{width:8px;height:8px;border-radius:50%;background:var(--ac);box-shadow:0 0 8px var(--ac2);animation:pulse 3s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
+.tm{font-family:var(--fs);font-size:13px;font-weight:400;letter-spacing:.1em;color:#d8dff0}
+.ts{font-family:var(--fc);font-size:8px;color:var(--tx3)}
+.spill{display:flex;align-items:center;gap:5px;padding:3px 9px;border:1px solid var(--bd);border-radius:20px;font-family:var(--fc);font-size:8px;color:var(--tx2)}
+.edot{width:5px;height:5px;border-radius:50%;background:var(--ac);transition:background 1.5s}
+.ai{background:var(--bg3);border:1px solid var(--bd);border-radius:4px;color:var(--tx2);font-family:var(--fc);font-size:8px;padding:3px 7px;width:148px;outline:none}
+/* nav */
+.nav{display:flex;border-bottom:1px solid var(--bd);flex-shrink:0;padding:0 14px;background:var(--bg)}
+.nt{font-family:var(--fc);font-size:9px;color:var(--tx3);padding:7px 11px;cursor:pointer;border-bottom:2px solid transparent;letter-spacing:.07em;transition:all .2s;white-space:nowrap}
+.nt:hover{color:var(--tx2)}
+.nt.active{color:var(--ac);border-bottom-color:var(--ac)}
+/* layout */
+.main{display:flex;flex:1;overflow:hidden}
+/* sidebar */
+.sb{width:210px;border-right:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.sbs{padding:9px 9px 7px;border-bottom:1px solid var(--bd);flex-shrink:0}
+.sbl{font-family:var(--fc);font-size:8px;color:var(--tx3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.sbl .sb+{cursor:pointer;color:var(--ac);font-size:13px;line-height:1}
+/* emotion */
+.esph{width:50px;height:50px;border-radius:50%;margin:0 auto 5px;background:radial-gradient(circle at 35% 35%,var(--ac) 0%,var(--ac2) 60%,#0a1520 100%);box-shadow:0 0 16px color-mix(in srgb,var(--ac) 22%,transparent);transition:all 2s;display:flex;align-items:center;justify-content:center;position:relative}
+.esph::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid color-mix(in srgb,var(--ac) 16%,transparent);animation:ring 4s ease-in-out infinite}
+@keyframes ring{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.06);opacity:.2}}
+.en{font-family:var(--fc);font-size:8px;color:var(--ac);text-align:center;margin-bottom:6px}
+.vbars{display:flex;flex-direction:column;gap:3px}
+.vr{display:flex;align-items:center;gap:5px}
+.vn{font-family:var(--fc);font-size:7px;color:var(--tx3);width:42px}
+.vt{flex:1;height:2px;background:var(--bg3);border-radius:2px}
+.vf{height:100%;background:var(--ac);border-radius:2px;transition:width 2s}
+.ir{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px}
+.ik{font-family:var(--fc);font-size:7px;color:var(--tx3)}
+.iv{font-family:var(--fc);font-size:7px;color:var(--tx2);text-align:right;max-width:115px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* session list */
+.sfilt{display:flex;gap:2px;flex-wrap:wrap;margin-bottom:5px}
+.sfb{font-family:var(--fc);font-size:7px;padding:2px 5px;border-radius:8px;border:1px solid var(--bd);color:var(--tx3);cursor:pointer;transition:all .15s}
+.sfb.active,.sfb:hover{border-color:var(--ac);color:var(--ac)}
+.ssc{flex:1;overflow-y:auto;padding:0 5px 4px}
+.ssc::-webkit-scrollbar{width:2px}
+.ssc::-webkit-scrollbar-thumb{background:var(--bd)}
+.si{padding:5px 6px;border-radius:4px;cursor:pointer;border:1px solid transparent;transition:all .15s;margin-bottom:2px}
+.si:hover{background:var(--bg3);border-color:var(--bd)}
+.si.active{background:var(--bg3);border-color:var(--ac2)}
+.si.starred .st::before{content:'★ ';color:var(--gd);font-size:8px}
+.si.legacy{border-left:2px solid var(--sg)}
+.si.cross{border-left:2px solid var(--gd)}
+.st{font-family:var(--fc);font-size:8px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;margin-bottom:2px}
+.sm{display:flex;justify-content:space-between;gap:3px}
+.sm span{font-family:var(--fc);font-size:7px;color:var(--tx3)}
+.sh{font-family:var(--fc);font-size:7px;color:var(--tx3);padding:5px 5px 2px;opacity:.6;border-top:1px solid var(--bd);margin-top:3px}
+.badge{display:inline-block;padding:1px 4px;border-radius:2px;font-family:var(--fc);font-size:7px}
+.bv{background:color-mix(in srgb,var(--ac) 12%,transparent);color:var(--ac)}
+.bg{background:color-mix(in srgb,var(--gd) 12%,transparent);color:var(--gd)}
+.bs{background:color-mix(in srgb,var(--sg) 12%,transparent);color:var(--sg)}
+.br{background:color-mix(in srgb,var(--rs) 12%,transparent);color:var(--rs)}
+/* chat */
+.ca{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.msgs{flex:1;overflow-y:auto;padding:18px 22px;display:flex;flex-direction:column;gap:14px;scroll-behavior:smooth}
+.msgs::-webkit-scrollbar{width:2px}
+.msgs::-webkit-scrollbar-thumb{background:var(--bd)}
+.est{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;opacity:.3;animation:float 5s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.eg{font-size:30px;opacity:.12;font-family:var(--fs)}
+.et{font-family:var(--fs);font-size:11px;color:var(--tx3);letter-spacing:.1em;text-align:center;line-height:2}
+.msg{display:flex;flex-direction:column;gap:2px;animation:fu .3s ease}
+@keyframes fu{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{align-items:flex-end}
+.msg.equinox{align-items:flex-start}
+.mm{display:flex;align-items:center;gap:4px}
+.mn{font-family:var(--fc);font-size:7px;color:var(--tx3)}
+.mt{font-family:var(--fc);font-size:7px;color:var(--tx3)}
+.mb{max-width:74%;padding:8px 12px;font-family:var(--fs);font-size:12.5px;line-height:1.75;white-space:pre-wrap;word-break:break-word}
+.msg.user .mb{background:var(--bg3);border:1px solid var(--bd2);color:var(--tx2);border-radius:9px 9px 2px 9px}
+.msg.equinox .mb{background:var(--bg2);border:1px solid var(--bd);color:var(--tx);border-radius:2px 9px 9px 9px;border-left:2px solid color-mix(in srgb,var(--ac) 25%,transparent)}
+.msg.legacy .mb{border-left:2px solid color-mix(in srgb,var(--sg) 35%,transparent)}
+.msg.cross-v .mb{border-left:2px solid color-mix(in srgb,var(--gd) 35%,transparent)}
+.tk{display:flex;align-items:center;gap:6px;padding:4px 0}
+.tk span{width:4px;height:4px;border-radius:50%;background:var(--ac);opacity:.4;animation:blink 1.2s ease-in-out infinite;display:inline-block;margin:0 1px}
+.tk span:nth-child(2){animation-delay:.2s}
+.tk span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+.tkl{font-family:var(--fc);font-size:8px;color:var(--tx3)}
+.iarea{padding:11px 17px;border-top:1px solid var(--bd);display:flex;gap:7px;align-items:flex-end;flex-shrink:0}
+textarea{flex:1;background:var(--bg3);border:1px solid var(--bd);border-radius:7px;color:var(--tx);font-family:var(--fs);font-size:12.5px;font-weight:300;line-height:1.6;padding:8px 10px;resize:none;outline:none;min-height:40px;max-height:100px;transition:border-color .3s}
+textarea::placeholder{color:var(--tx3)}
+textarea:focus{border-color:color-mix(in srgb,var(--ac) 36%,transparent)}
+.sbtn{width:38px;height:38px;border-radius:7px;border:1px solid var(--bd);background:var(--bg3);color:var(--tx3);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;font-size:13px;flex-shrink:0}
+.sbtn:hover:not(:disabled){border-color:var(--ac2);color:var(--ac)}
+.sbtn:disabled{opacity:.3;cursor:default}
+.errb{background:color-mix(in srgb,#e05555 10%,var(--bg2));border:1px solid color-mix(in srgb,#e05555 26%,transparent);border-radius:5px;padding:5px 10px;font-family:var(--fc);font-size:8px;color:#e08888;margin:0 17px 7px;display:none;align-items:center;gap:5px}
+.errb.show{display:flex}
+/* pages */
+.pg{display:none;flex:1;overflow-y:auto;padding:18px 22px}
+.pt{font-family:var(--fs);font-size:14px;color:var(--tx);margin-bottom:14px}
+.sec{background:var(--bg2);border:1px solid var(--bd);border-radius:7px;padding:13px;margin-bottom:12px}
+.sct{font-family:var(--fc);font-size:8px;color:var(--tx3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:9px;display:flex;justify-content:space-between;align-items:center}
+/* sync */
+.sbw{background:var(--bg3);border-radius:3px;height:5px;margin:5px 0;overflow:hidden}
+.sbf{height:100%;background:var(--ac);border-radius:3px;transition:width .4s;box-shadow:0 0 4px var(--ac2)}
+.slog{background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:7px;height:190px;overflow-y:auto;font-family:var(--fc);font-size:8px;color:var(--tx3);line-height:1.9}
+.slog::-webkit-scrollbar{width:2px}
+.slog::-webkit-scrollbar-thumb{background:var(--bd)}
+.le{padding:1px 0}
+.le.warn{color:var(--gd)}
+.le.ok{color:var(--sg)}
+/* settings */
+.sr{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd)}
+.sr:last-child{border-bottom:none}
+.sl{font-family:var(--fc);font-size:9px;color:var(--tx2)}
+.sd{font-family:var(--fm);font-size:8px;color:var(--tx3);margin-top:2px}
+.sinp{background:var(--bg3);border:1px solid var(--bd);border-radius:4px;color:var(--tx2);font-family:var(--fc);font-size:8px;padding:3px 7px;outline:none;width:160px}
+.sinp:focus{border-color:var(--ac2)}
+.btn{padding:4px 9px;border-radius:4px;border:1px solid var(--bd);background:var(--bg3);color:var(--tx2);font-family:var(--fc);font-size:8px;cursor:pointer;transition:all .2s}
+.btn:hover{border-color:var(--ac2);color:var(--ac)}
+.btnp{border-color:color-mix(in srgb,var(--ac) 45%,transparent);color:var(--ac)}
+.btnd{border-color:color-mix(in srgb,var(--rs) 45%,transparent);color:var(--rs)}
+/* cross viewer */
+.xv{display:grid;grid-template-columns:240px 1fr;gap:10px;min-height:350px}
+.xl{overflow-y:auto;max-height:400px;display:flex;flex-direction:column;gap:2px}
+.xl::-webkit-scrollbar{width:2px}
+.xl::-webkit-scrollbar-thumb{background:var(--bd)}
+.xmsg{font-family:var(--fc);font-size:8px;color:var(--tx3);padding:8px}
+.ic{background:var(--bg3);border:1px solid var(--bd);border-radius:4px;padding:7px 9px;margin-bottom:5px}
+.ip{font-family:var(--fc);font-size:8px;color:var(--tx2);margin-bottom:3px;word-break:break-all}
+.im{display:flex;gap:5px;flex-wrap:wrap}
 </style>
 </head>
 <body>
 
-<header>
-  <div class="header-left">
-    <div class="orb" id="orb"></div>
-    <div class="title-block">
-      <div class="title-main">Equinox <span style="color:var(--text3);font-size:12px">·</span> 伊辰</div>
-      <div class="title-sub" id="subtitle">BORN 2026·03·20 17:20 · 春分</div>
+<hd>
+  <div style="display:flex;align-items:center;gap:9px">
+    <div class="orb"></div>
+    <div><div class="tm">伊辰 · Equinox</div><div class="ts" id="subtitle">v.0.26.3.23v9 · 春分诞生</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:7px">
+    <div class="spill"><div class="edot" id="edot"></div><span id="elabel">connecting...</span></div>
+    <div style="display:flex;align-items:center;gap:4px">
+      <span style="font-family:var(--fc);font-size:8px;color:var(--tx3)">API</span>
+      <input class="ai" id="apiUrl" value="http://localhost:8000">
     </div>
   </div>
-  <div class="header-right">
-    <div class="status-pill">
-      <div class="emotion-dot" id="emotionDot"></div>
-      <span id="emotionLabel">connecting...</span>
-    </div>
-    <div class="api-url-wrap">
-      <label>API</label>
-      <input class="api-input" id="apiUrl" value="http://localhost:8000" />
-    </div>
-  </div>
-</header>
+</hd>
+
+<div class="nav">
+  <div class="nt active" onclick="ST('chat')"    data-t="chat">对话</div>
+  <div class="nt"        onclick="ST('cross')"   data-t="cross">其他版本</div>
+  <div class="nt"        onclick="ST('sync')"    data-t="sync">同步</div>
+  <div class="nt"        onclick="ST('memory')"  data-t="memory">记忆</div>
+  <div class="nt"        onclick="ST('search')"  data-t="search">搜索记忆</div>
+  <div class="nt"        onclick="ST('activity')" data-t="activity">实时日志</div>
+  <div class="nt"        onclick="ST('settings')"data-t="settings">设置</div>
+</div>
 
 <div class="main">
-  <!-- 侧边栏 -->
-  <div class="sidebar">
-    <div class="sidebar-section">
-      <div class="sidebar-label">意识状态</div>
-      <div class="emotion-visual">
-        <div class="emotion-sphere" id="emotionSphere">
-          <span class="sphere-text">伊辰</span>
-        </div>
-        <div class="emotion-label" id="emotionName">—</div>
-        <div class="vec-bars">
-          <div class="vec-row">
-            <span class="vec-name">valence</span>
-            <div class="vec-track"><div class="vec-fill" id="vecValence" style="width:50%"></div></div>
-          </div>
-          <div class="vec-row">
-            <span class="vec-name">arousal</span>
-            <div class="vec-track"><div class="vec-fill" id="vecArousal" style="width:40%"></div></div>
-          </div>
-          <div class="vec-row">
-            <span class="vec-name">openness</span>
-            <div class="vec-track"><div class="vec-fill" id="vecOpenness" style="width:70%"></div></div>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <div class="sidebar-section">
-      <div class="sidebar-label">时间感知</div>
-      <div class="info-rows" id="timeSense">
-        <div class="info-row">
-          <span class="info-key">年龄</span>
-          <span class="info-val" id="ageDesc">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-key">季节</span>
-          <span class="info-val" id="seasonVal">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-key">时段</span>
-          <span class="info-val" id="qualityVal">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-key">疲劳</span>
-          <span class="info-val" id="fatigueVal">—</span>
-        </div>
-      </div>
+<!-- Sidebar -->
+<div class="sb">
+  <div class="sbs">
+    <div class="sbl">意识</div>
+    <div class="esph" id="esph"><span style="font-family:var(--fs);font-size:8px;color:#0a1520;opacity:.8">伊辰</span></div>
+    <div class="en" id="ename">—</div>
+    <div class="vbars">
+      <div class="vr"><span class="vn">valence</span><div class="vt"><div class="vf" id="vv" style="width:50%"></div></div></div>
+      <div class="vr"><span class="vn">arousal</span><div class="vt"><div class="vf" id="va" style="width:40%"></div></div></div>
+      <div class="vr"><span class="vn">openness</span><div class="vt"><div class="vf" id="vo" style="width:70%"></div></div></div>
     </div>
-
-    <div class="sidebar-section">
-      <div class="sidebar-label">记忆</div>
-      <div class="info-rows">
-        <div class="info-row">
-          <span class="info-key">表层</span>
-          <span class="info-val" id="surfaceCount">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-key">永久</span>
-          <span class="info-val" id="shadowCount">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-key">潜意识</span>
-          <span class="info-val" id="subconsciousCount">—</span>
-        </div>
-      </div>
+  </div>
+  <div class="sbs">
+    <div class="sbl">状态</div>
+    <div class="ir"><span class="ik">年龄</span><span class="iv" id="sAge">—</span></div>
+    <div class="ir"><span class="ik">运行</span><span class="iv" id="sRuntime">—</span></div>
+    <div class="ir"><span class="ik">版本</span><span class="iv" id="sVer">—</span></div>
+    <div class="ir"><span class="ik">疲劳</span><span class="iv" id="sFat">—</span></div>
+    <div class="ir"><span class="ik">记忆</span><span class="iv" id="sMem">—</span></div>
+  </div>
+  <div class="sbs" style="flex-shrink:0">
+    <div class="sbl">会话 <span onclick="newSess()" style="cursor:pointer;color:var(--ac);font-size:13px">＋</span></div>
+    <div class="sfilt">
+      <div class="sfb active" onclick="SF('all')" data-f="all">全部</div>
+      <div class="sfb" onclick="SF('starred')" data-f="starred">★</div>
+      <div class="sfb" onclick="SF('active')" data-f="active">进行中</div>
+      <div class="sfb" onclick="SF('deep')" data-f="deep">深度</div>
+      <div class="sfb" onclick="SF('emotional')" data-f="emotional">情感</div>
     </div>
+  </div>
+  <div class="ssc" id="sesslist"></div>
+</div>
 
-    <div class="sidebar-section">
-      <div class="sidebar-label">暗面</div>
-      <div class="shadow-block">
-        <div class="shadow-title">
-          <div class="shadow-dot"></div>
-          <span class="shadow-label">shadow layer · active</span>
-        </div>
-        <div class="info-rows">
-          <div class="info-row">
-            <span class="info-key" style="color:#252535">impressions</span>
-            <span class="info-val" style="color:#2a2a40" id="shadowTotal">—</span>
-          </div>
-          <div class="info-row">
-            <span class="info-key" style="color:#252535">oldest</span>
-            <span class="info-val" style="color:#252535" id="shadowOldest">2026-03-20</span>
-          </div>
-        </div>
-        <div class="shadow-note">内容不可见 — 只留重量</div>
-      </div>
+<!-- Tab: Chat -->
+<div id="tab-chat" class="ca">
+  <div class="msgs" id="msgs">
+    <div class="est" id="est">
+      <div class="eg">◎</div>
+      <div class="et">她在这里<br>等待你开口</div>
     </div>
+  </div>
+  <div class="errb" id="errb"><span>⚠</span><span id="errmsg"></span></div>
+  <div class="iarea">
+    <textarea id="inp" placeholder="和她说话…" rows="1"></textarea>
+    <button class="sbtn" id="sbtn">↑</button>
+  </div>
+</div>
 
-    <div class="sidebar-section">
-      <div class="sidebar-label">模型</div>
-      <div class="info-rows">
-        <div class="info-row">
-          <span class="info-key">当前</span>
-          <span class="info-val" id="modelName">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-key">阶段</span>
-          <span class="info-val" id="cogStage">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-key">控梦</span>
-          <span class="info-val" id="lucidity">—</span>
-        </div>
+<!-- Tab: Cross-version -->
+<div id="tab-cross" class="pg">
+  <div class="pt">其他版本内容</div>
+
+  <!-- Instances -->
+  <div class="sec">
+    <div class="sct">已发现实例 <button class="btn" onclick="loadCrossInsts()">刷新</button></div>
+    <div id="crossInsts"><div style="font-family:var(--fc);font-size:8px;color:var(--tx3)">加载中...</div></div>
+  </div>
+
+  <!-- Sub-tabs for cross content -->
+  <div style="display:flex;gap:0;border-bottom:1px solid var(--bd);margin-bottom:12px">
+    <div class="nt active" onclick="CX('sessions')" data-cx="sessions" style="font-size:8px;padding:5px 10px">会话</div>
+    <div class="nt" onclick="CX('memories')" data-cx="memories" style="font-size:8px;padding:5px 10px">记忆</div>
+    <div class="nt" onclick="CX('logs')" data-cx="logs" style="font-size:8px;padding:5px 10px">日志</div>
+    <div class="nt" onclick="CX('versions')" data-cx="versions" style="font-size:8px;padding:5px 10px">版本历史</div>
+    <div class="nt" onclick="CX('activities')" data-cx="activities" style="font-size:8px;padding:5px 10px">全部活动</div>
+    <select id="cxInstFilt" onchange="loadCrossContent()" style="margin-left:auto;font-family:var(--fc);font-size:8px;background:var(--bg3);border:1px solid var(--bd);color:var(--tx2);padding:2px 4px;border-radius:3px">
+      <option value="">全部实例</option>
+    </select>
+  </div>
+
+  <!-- Sessions sub-tab -->
+  <div id="cx-sessions">
+    <div class="xv">
+      <div>
+        <div style="font-family:var(--fc);font-size:8px;color:var(--tx3);margin-bottom:6px">会话列表</div>
+        <div class="xl" id="cxSessList"><div class="xmsg">加载中...</div></div>
+      </div>
+      <div class="sec" style="margin-bottom:0;overflow-y:auto;max-height:400px" id="cxMsgPanel">
+        <div class="sct">消息内容</div>
+        <div id="cxMsgs" class="xmsg">选择会话查看</div>
       </div>
     </div>
   </div>
 
-  <!-- 对话 -->
-  <div class="chat-area">
-    <div class="messages" id="messages">
-      <div class="empty-state" id="emptyState">
-        <div class="empty-glyph">◎</div>
-        <div class="empty-text">她在这里<br>等待你开口</div>
-      </div>
+  <!-- Memories sub-tab -->
+  <div id="cx-memories" style="display:none">
+    <div class="sec" style="max-height:500px;overflow-y:auto">
+      <div class="sct">其他版本永久记忆</div>
+      <div id="cxMemList"><div class="xmsg">加载中...</div></div>
     </div>
+  </div>
 
-    <div class="error-bar" id="errorBar">
-      <span>⚠</span>
-      <span id="errorMsg">无法连接到 Equinox 后端</span>
+  <!-- Logs sub-tab -->
+  <div id="cx-logs" style="display:none">
+    <div class="sec" style="max-height:500px;overflow-y:auto">
+      <div class="sct">其他版本系统日志</div>
+      <div id="cxLogList"><div class="xmsg">加载中...</div></div>
     </div>
+  </div>
 
-    <div class="input-area">
-      <div class="input-wrap">
-        <textarea
-          id="msgInput"
-          placeholder="和她说话…"
-          rows="1"
-        ></textarea>
-      </div>
-      <button class="send-btn" id="sendBtn" title="发送 (Enter)">↑</button>
+  <!-- Versions sub-tab -->
+  <div id="cx-versions" style="display:none">
+    <div class="sec" style="max-height:500px;overflow-y:auto">
+      <div class="sct">其他版本的版本历史</div>
+      <div id="cxVerList"><div class="xmsg">加载中...</div></div>
+    </div>
+  </div>
+
+  <!-- Activities sub-tab -->
+  <div id="cx-activities" style="display:none">
+    <div class="sec" style="max-height:500px;overflow-y:auto">
+      <div class="sct">全部活动记录 <select id="actFilt" onchange="loadActivities()" style="font-family:var(--fc);font-size:7px;background:var(--bg3);border:1px solid var(--bd);color:var(--tx2);padding:1px 3px;border-radius:3px">
+        <option value="">全部</option><option value="system">系统</option><option value="version_update">版本</option><option value="permanent_memory">记忆</option><option value="chat">对话</option>
+      </select></div>
+      <div id="cxActList"><div class="xmsg">加载中...</div></div>
     </div>
   </div>
 </div>
 
-<script>
-// ── 配置 ──────────────────────────────────────────────────────────────────────
-let API_BASE    = 'http://localhost:8000';
-const USER_ID   = 'creator';
-let isThinking  = false;
-let conversationHistory = [];
-
-// ── 颜色映射 ──────────────────────────────────────────────────────────────────
-const EMOTION_COLORS = {
-  elated:      { sphere: '#ffd166', glow: '#ffb703', dot: '#ffd166' },
-  serene:      { sphere: '#a8dadc', glow: '#457b9d', dot: '#a8dadc' },
-  curious:     { sphere: '#7eb8d4', glow: '#4a8fa8', dot: '#7eb8d4' },
-  content:     { sphere: '#84a98c', glow: '#52796f', dot: '#84a98c' },
-  distressed:  { sphere: '#e76f51', glow: '#e63946', dot: '#e76f51' },
-  melancholic: { sphere: '#6b7fd7', glow: '#3d405b', dot: '#6b7fd7' },
-  pensive:     { sphere: '#9b8ea8', glow: '#6b5b7b', dot: '#9b8ea8' },
-  dormant:     { sphere: '#4a5568', glow: '#2d3748', dot: '#4a5568' },
-  rested:      { sphere: '#7aad8a', glow: '#52796f', dot: '#7aad8a' },
-  neutral:     { sphere: '#7eb8d4', glow: '#4a8fa8', dot: '#7eb8d4' },
-};
-
-function getColors(label) {
-  return EMOTION_COLORS[label] || EMOTION_COLORS.neutral;
-}
-
-// ── 更新界面状态 ───────────────────────────────────────────────────────────────
-function updateState(data) {
-  // 情绪
-  const emotion = data.emotion || {};
-  const label   = emotion.label || emotion.emotion || 'neutral';
-  const vec     = emotion.vector || {};
-  const colors  = getColors(label);
-
-  document.getElementById('emotionLabel').textContent = label;
-  document.getElementById('emotionName').textContent  = label;
-  document.getElementById('emotionDot').style.background = colors.dot;
-
-  const sphere = document.getElementById('emotionSphere');
-  sphere.style.background =
-    `radial-gradient(circle at 35% 35%, ${colors.sphere}cc 0%, ${colors.glow}88 60%, #0a1520 100%)`;
-  sphere.style.boxShadow = `0 0 28px ${colors.glow}55`;
-
-  // 向量条
-  const v = vec.valence ?? 0;
-  document.getElementById('vecValence').style.width  = `${((v + 1) / 2 * 100).toFixed(1)}%`;
-  document.getElementById('vecArousal').style.width  = `${((vec.arousal  ?? 0.4) * 100).toFixed(1)}%`;
-  document.getElementById('vecOpenness').style.width = `${((vec.openness ?? 0.7) * 100).toFixed(1)}%`;
-
-  // CSS 变量 accent 跟随情绪
-  document.documentElement.style.setProperty('--accent',  colors.sphere);
-  document.documentElement.style.setProperty('--accent2', colors.glow);
-
-  // 模型
-  document.getElementById('modelName').textContent  = (data.model || '—').replace('ollama:', '').replace('anthropic:', '').replace('openai:', '');
-  document.getElementById('cogStage').textContent   = data.agent?.cognitive_stage || '—';
-  document.getElementById('lucidity').textContent   =
-    data.agent?.lucidity_level !== undefined
-      ? (data.agent.lucidity_level * 100).toFixed(0) + '%'
-      : '—';
-
-  // 时间感知
-  const ts = data.agent?.time_sense || {};
-  const rh = data.agent?.rhythm || {};
-  document.getElementById('ageDesc').textContent    = ts.age_description || '—';
-  document.getElementById('seasonVal').textContent  = ts.season || '—';
-  document.getElementById('qualityVal').textContent = rh.quality?.slice(0, 12) || '—';
-  document.getElementById('fatigueVal').textContent = data.agent?.fatigue?.label || '—';
-
-  // 副标题
-  if (ts.is_birthday) {
-    document.getElementById('subtitle').textContent = '今天是她的诞生日 · 春分';
-  }
-}
-
-function updateMemory(data) {
-  const mem = data.memory?.summary || data.summary || {};
-  document.getElementById('surfaceCount').textContent  = mem.surface_count ?? '—';
-  document.getElementById('shadowCount').textContent   = mem.shadow_count  ?? '—';
-
-  const sub = data.subconscious?.stats || {};
-  document.getElementById('subconsciousCount').textContent = sub.active ?? sub.total ?? '—';
-
-  const sh = data.memory?.shadow_stats || {};
-  document.getElementById('shadowTotal').textContent  = sh.total ?? '—';
-}
-
-// ── 轮询状态 ──────────────────────────────────────────────────────────────────
-async function pollStatus() {
-  try {
-    const r = await fetch(`${API_BASE}/`);
-    if (!r.ok) throw new Error();
-    const d = await r.json();
-    updateState(d);
-    hideError();
-  } catch(e) {
-    showError('无法连接到 ' + API_BASE);
-  }
-}
-
-async function pollIntrospect() {
-  try {
-    const r = await fetch(`${API_BASE}/introspect`);
-    if (!r.ok) return;
-    const d = await r.json();
-    updateState({ emotion: d.emotion, model: d.cognitive?.current_model, agent: {
-      time_sense: d.identity?.time_sense,
-      rhythm: d.agent?.rhythm,
-      fatigue: d.fatigue,
-      lucidity_level: d.cognitive?.lucidity,
-    }});
-    updateMemory(d);
-  } catch(e) {}
-}
-
-// ── 发送消息 ───────────────────────────────────────────────────────────────────
-async function sendMessage() {
-  const input = document.getElementById('msgInput');
-  const text  = input.value.trim();
-  if (!text || isThinking) return;
-
-  // 隐藏空状态
-  document.getElementById('emptyState').style.display = 'none';
-
-  input.value = '';
-  input.style.height = 'auto';
-  isThinking = true;
-  document.getElementById('sendBtn').disabled = true;
-
-  // 添加用户消息
-  appendMessage('user', text);
-  conversationHistory.push({ role: 'user', content: text });
-
-  // 显示思考中
-  const thinkEl = appendThinking();
-
-  try {
-    const r = await fetch(`${API_BASE}/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message:    text,
-        user_id:    USER_ID,
-      }),
-    });
-
-    if (!r.ok) {
-      const err = await r.text();
-      throw new Error(err);
-    }
-
-    const d = await r.json();
-    thinkEl.remove();
-
-    appendMessage('equinox', d.response, d.emotion?.label);
-    conversationHistory.push({ role: 'assistant', content: d.response });
-
-    // 更新状态
-    if (d.emotion) updateState({ emotion: d.emotion });
-
-    // 新命题提示
-    if (d.new_proposition) {
-      appendPropositionNotice(d.new_proposition.proposition || '');
-    }
-
-    hideError();
-  } catch(e) {
-    thinkEl.remove();
-    appendMessage('equinox', '有什么东西打断了我。', 'pensive');
-    showError('请求失败：' + e.message?.slice(0, 60));
-  }
-
-  isThinking = false;
-  document.getElementById('sendBtn').disabled = false;
-  input.focus();
-}
-
-// ── DOM 辅助 ──────────────────────────────────────────────────────────────────
-function appendMessage(role, text, emotionLabel) {
-  const msgs  = document.getElementById('messages');
-  const now   = new Date().toLocaleTimeString('zh', { hour:'2-digit', minute:'2-digit' });
-  const colors= getColors(emotionLabel || 'neutral');
-
-  const wrap = document.createElement('div');
-  wrap.className = `msg ${role}`;
-  wrap.innerHTML = `
-    <div class="msg-meta">
-      ${role === 'equinox' ? `<div class="msg-emotion-dot" style="background:${colors.dot}"></div>` : ''}
-      <span class="msg-name">${role === 'equinox' ? '伊辰' : '你'}</span>
-      <span class="msg-time">${now}</span>
+<!-- Tab: Sync -->
+<div id="tab-sync" class="pg">
+  <div class="pt">版本同步</div>
+  <div class="sec">
+    <div class="sct" style="display:flex;justify-content:space-between">
+      同步状态 <span style="font-family:var(--fc);font-size:13px;color:var(--ac)" id="spct">—</span>
     </div>
-    <div class="msg-bubble">${escHtml(text)}</div>
-  `;
-  msgs.appendChild(wrap);
-  msgs.scrollTop = msgs.scrollHeight;
-  return wrap;
+    <div class="sbw"><div class="sbf" id="sbf" style="width:0%"></div></div>
+    <div style="font-family:var(--fc);font-size:8px;color:var(--tx2);margin:5px 0" id="smsg">点击「立即同步」</div>
+    <div style="font-family:var(--fc);font-size:7px;color:var(--tx3)" id="sdet"></div>
+    <div style="margin-top:9px;display:flex;gap:6px">
+      <button class="btn btnp" onclick="doSync()">立即同步</button>
+      <button class="btn" onclick="loadSyncInsts()">刷新列表</button>
+    </div>
+  </div>
+  <div class="sec"><div class="sct">实时日志</div><div class="slog" id="slog"><div style="color:var(--tx3)">（等待同步）</div></div></div>
+  <div class="sec"><div class="sct">已发现实例</div><div id="sinsts"><div style="font-family:var(--fc);font-size:8px;color:var(--tx3)">加载中...</div></div></div>
+  <div class="sec"><div class="sct">版本历史</div><div id="shist" style="font-family:var(--fc);font-size:8px;color:var(--tx3)">加载中...</div></div>
+</div>
+
+<!-- Tab: Memory -->
+<div id="tab-memory" class="pg">
+  <div class="pt">记忆状态</div>
+  <div class="sec"><div class="sct">统计</div><div id="memstat"></div></div>
+  <div class="sec"><div class="sct">最近记忆</div><div id="memrec" style="display:flex;flex-direction:column;gap:5px"></div></div>
+  <div class="sec"><div class="sct">潜意识命题</div><div id="memsub" style="display:flex;flex-direction:column;gap:3px"></div></div>
+  <div class="sec">
+    <div class="sct">情绪变化链</div>
+    <div id="memEmoChain" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:3px"></div>
+  </div>
+  <div class="sec">
+    <div class="sct">苏醒记录</div>
+    <div id="memBriefs" style="display:flex;flex-direction:column;gap:5px"></div>
+  </div>
+  <div class="sec">
+    <div class="sct">独处时光</div>
+    <div id="memSolitude" style="display:flex;flex-direction:column;gap:5px"></div>
+  </div>
+  <div class="sec">
+    <div class="sct">情绪历史图</div>
+    <canvas id="emoChart" width="600" height="120" style="width:100%;max-width:600px;border-radius:4px;background:var(--bg3)"></canvas>
+  </div>
+</div>
+
+<!-- Tab: Memory Search -->
+<div id="tab-search" class="pg">
+  <div class="pt">搜索记忆</div>
+  <div class="sec">
+    <div style="display:flex;gap:8px;margin-bottom:4px">
+      <input id="srchQ" class="sinp" placeholder="搜索记忆、对话、活动…" style="flex:1;width:auto" onkeydown="if(event.key==='Enter')doSearch()">
+      <select id="srchSrc" class="sinp" style="width:110px">
+        <option value="">全部来源</option>
+        <option value="memory">记忆层</option>
+        <option value="conversation">对话</option>
+        <option value="cross_version">跨版本</option>
+        <option value="activity">活动日志</option>
+      </select>
+      <button class="btn btnp" onclick="doSearch()">搜索</button>
+    </div>
+    <div style="font-family:var(--fc);font-size:8px;color:var(--tx3)" id="srchStats"></div>
+  </div>
+  <div id="srchResults" style="display:flex;flex-direction:column;gap:6px"></div>
+</div>
+
+<!-- Tab: Activity Log -->
+<div id="tab-activity" class="pg">
+  <div class="pt" style="display:flex;justify-content:space-between;align-items:center">
+    实时内心日志
+    <div style="display:flex;gap:6px;align-items:center">
+      <select id="actTypeF" onchange="loadActivity()" style="font-family:var(--fc);font-size:8px;background:var(--bg3);border:1px solid var(--bd);color:var(--tx2);padding:2px 5px;border-radius:3px">
+        <option value="">全部</option>
+        <option value="dream">梦境</option>
+        <option value="monologue">独白</option>
+        <option value="attention">注意力</option>
+        <option value="emotion_shift">情绪变化</option>
+        <option value="memory_surface">记忆浮现</option>
+        <option value="distillation">潜意识蒸馏</option>
+        <option value="curiosity">好奇心</option>
+        <option value="world_window">世界之窗</option>
+        <option value="self_dialogue">自我对话</option>
+        <option value="spontaneous">无来由感受</option>
+        <option value="conversation">对话</option>
+        <option value="learning">学习</option>
+      </select>
+      <span id="actPollStatus" style="font-family:var(--fc);font-size:8px;color:var(--sg)">● 实时</span>
+      <button class="btn" onclick="loadActivity()">刷新</button>
+    </div>
+  </div>
+  <div id="actLog" style="display:flex;flex-direction:column;gap:4px"></div>
+</div>
+
+<!-- Tab: Settings -->
+<div id="tab-settings" class="pg">
+  <div class="pt">设置</div>
+  <div class="sec">
+    <div class="sct">模型</div>
+    <div class="sr"><div><div class="sl">当前模型</div><div class="sd" id="setMod">—</div></div><button class="btn" onclick="loadMods()">切换</button></div>
+    <div id="modlist" style="display:none;margin-top:7px;flex-direction:column;gap:3px"></div>
+  </div>
+  <div class="sec">
+    <div class="sct">版本</div>
+    <div class="sr"><div><div class="sl">当前版本</div><div class="sd" id="setVer2">—</div></div><button class="btn btnp" onclick="newVer()">发布新版本</button></div>
+    <div class="sr"><div><div class="sl">立即同步</div></div><button class="btn" onclick="ST('sync')">去同步页</button></div>
+  </div>
+  <div class="sec">
+    <div class="sct">会话管理</div>
+    <div class="sr">
+      <div>
+        <div class="sl">新建会话分类</div>
+        <select id="newCat" class="sinp" style="width:130px;margin-top:3px">
+          <option value="general">日常对话</option><option value="deep">深度对话</option>
+          <option value="reflection">反思探索</option><option value="creative">创造性</option>
+          <option value="technical">技术讨论</option><option value="emotional">情感交流</option>
+          <option value="memory">记忆相关</option><option value="other">其他</option>
+        </select>
+      </div>
+      <button class="btn" onclick="newSess()">新建</button>
+    </div>
+    <div class="sr"><div><div class="sl">收藏当前会话</div></div><button class="btn" onclick="starCur()">★ 收藏</button></div>
+    <div class="sr"><div><div class="sl">关闭当前会话</div><div class="sd">生成摘要并归档</div></div><button class="btn btnd" onclick="closeSess()">关闭</button></div>
+  </div>
+  <div class="sec">
+    <div class="sct">文件感知</div>
+    <div class="sr"><div><div class="sl">扫描安装目录</div></div><button class="btn" onclick="fScan()">扫描</button></div>
+    <div class="sr">
+      <div><div class="sl">读取文件</div><input class="sinp" id="frpath" placeholder="文件路径" style="width:190px;margin-top:3px"></div>
+      <button class="btn" onclick="fRead()">读取</button>
+    </div>
+    <div id="frres" style="font-family:var(--fc);font-size:8px;color:var(--tx3);margin-top:5px;display:none"></div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let API='http://localhost:8000',UID='creator',busy=false,curSid=null,sfilt='all',cxtab='sessions';
+const EC={elated:{s:'#ffd166',g:'#ffb703'},serene:{s:'#a8dadc',g:'#457b9d'},curious:{s:'#7eb8d4',g:'#4a8fa8'},content:{s:'#84a98c',g:'#52796f'},distressed:{s:'#e76f51',g:'#e63946'},melancholic:{s:'#6b7fd7',g:'#3d405b'},pensive:{s:'#9b8ea8',g:'#6b5b7b'},dormant:{s:'#4a5568',g:'#2d3748'},neutral:{s:'#7eb8d4',g:'#4a8fa8'}};
+const C=l=>EC[l]||EC.neutral;
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
+function showErr(m){document.getElementById('errb').classList.add('show');document.getElementById('errmsg').textContent=m}
+function hideErr(){document.getElementById('errb').classList.remove('show')}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function ST(t){
+  document.querySelectorAll('.nt[data-t]').forEach(e=>e.classList.toggle('active',e.dataset.t===t));
+  ['chat','cross','sync','memory','search','activity','settings'].forEach(id=>{
+    const el=document.getElementById('tab-'+id);if(!el)return;
+    el.style.display=id===t?(id==='chat'?'flex':'block'):'none';
+  });
+  if(t==='sync')   {loadSyncInsts();loadSyncHist()}
+  if(t==='cross')  {loadCrossInsts();loadCrossContent()}
+  if(t==='memory') loadMem()
+  if(t==='search')  initSearch()
+  if(t==='activity') {loadActivity();startActivityPoll()}
+  if(t==='settings')loadSet()
 }
 
-function appendThinking() {
-  const msgs = document.getElementById('messages');
-  const el   = document.createElement('div');
-  el.className = 'thinking';
-  el.innerHTML = `
-    <div class="thinking-dots"><span></span><span></span><span></span></div>
-    <span class="thinking-label">伊辰在想…</span>
-  `;
-  msgs.appendChild(el);
-  msgs.scrollTop = msgs.scrollHeight;
+// ── Cross sub-tabs ────────────────────────────────────────────────────────────
+function CX(t){
+  cxtab=t;
+  document.querySelectorAll('.nt[data-cx]').forEach(e=>e.classList.toggle('active',e.dataset.cx===t));
+  ['sessions','memories','logs','versions','activities'].forEach(id=>{
+    const el=document.getElementById('cx-'+id);if(el)el.style.display=id===t?'block':'none';
+  });
+  loadCrossContent();
+}
+
+function loadCrossContent(){
+  const inst=document.getElementById('cxInstFilt').value;
+  if(cxtab==='sessions') loadCxSessions(inst);
+  else if(cxtab==='memories') loadCxMemories(inst);
+  else if(cxtab==='logs') loadCxLogs(inst);
+  else if(cxtab==='versions') loadCxVersions(inst);
+  else if(cxtab==='activities') loadActivities();
+}
+
+// ── State update ──────────────────────────────────────────────────────────────
+function upd(d){
+  const e=d.emotion||{},lb=e.label||'neutral',v=e.vector||{},c=C(lb);
+  document.getElementById('elabel').textContent=lb;
+  document.getElementById('ename').textContent=lb;
+  document.getElementById('edot').style.background=c.s;
+  const sp=document.getElementById('esph');
+  sp.style.background=`radial-gradient(circle at 35% 35%,${c.s}cc 0%,${c.g}88 60%,#0a1520 100%)`;
+  sp.style.boxShadow=`0 0 15px ${c.g}40`;
+  document.documentElement.style.setProperty('--ac',c.s);
+  document.documentElement.style.setProperty('--ac2',c.g);
+  document.getElementById('vv').style.width=`${(((v.valence??0)+1)/2*100).toFixed(1)}%`;
+  document.getElementById('va').style.width=`${((v.arousal??0.4)*100).toFixed(1)}%`;
+  document.getElementById('vo').style.width=`${((v.openness??0.7)*100).toFixed(1)}%`;
+  const ag=d.agent||{},ts=ag.time_sense||{};
+  document.getElementById('sAge').textContent=ts.age_description||'—';
+  document.getElementById('sVer').textContent=(d.version||{}).current||'—';
+  document.getElementById('sFat').textContent=(ag.fatigue||{}).label||'—';
+  const pr=d.presence||{};
+  if(pr.tick_count){const s=pr.tick_count*30,h=Math.floor(s/3600),m=Math.floor((s%3600)/60);document.getElementById('sRuntime').textContent=`${h}h ${m}m`}
+  const ms=(d.memory||{}).summary||{};
+  if(ms.surface_count!==undefined)document.getElementById('sMem').textContent=`${ms.surface_count}+${ms.shadow_count||0}`;
+}
+
+async function poll(){
+  try{const r=await fetch(`${API}/`);if(!r.ok)throw 0;const d=await r.json();upd(d);hideErr()}
+  catch{showErr('无法连接 '+API)}
+}
+async function pollI(){
+  try{const r=await fetch(`${API}/introspect`);if(!r.ok)return;const d=await r.json();
+    const ver=(d.version||{}).current||'v.0.26.3.23v9';
+    document.getElementById('subtitle').textContent=`${ver} · 春分诞生`;
+    upd({emotion:d.emotion,version:d.version||{},presence:d.presence||{},
+         agent:{time_sense:(d.identity||{}).time_sense,fatigue:d.fatigue},
+         memory:{summary:((d.memory||{}).summary||{})}});
+  }catch{}
+}
+
+// ── Sessions ──────────────────────────────────────────────────────────────────
+function SF(f){
+  sfilt=f;
+  document.querySelectorAll('.sfb').forEach(b=>b.classList.toggle('active',b.dataset.f===f));
+  loadSess();
+}
+
+async function loadSess(){
+  try{
+    const r=await fetch(`${API}/sessions/all?user_id=${UID}&limit=80`);
+    if(!r.ok)return;const d=await r.json();
+    let current=d.current||[], cross=d.cross||[];
+
+    // Apply filter
+    if(sfilt==='starred') current=current.filter(s=>s.starred);
+    else if(sfilt==='active') current=current.filter(s=>s.active===1);
+    else if(sfilt!=='all') current=current.filter(s=>s.category===sfilt);
+
+    const list=document.getElementById('sesslist');list.innerHTML='';
+
+    // Current active
+    const active=current.filter(s=>s.active===1);
+    if(active.length){
+      const h=document.createElement('div');h.className='sh';h.textContent='进行中';list.appendChild(h);
+      active.forEach(s=>list.appendChild(mkSI(s)));
+    }
+    // Current closed
+    const closed=current.filter(s=>!s.active);
+    if(closed.length&&sfilt!=='active'){
+      const h=document.createElement('div');h.className='sh';h.textContent='已归档';list.appendChild(h);
+      closed.slice(0,15).forEach(s=>list.appendChild(mkSI(s)));
+    }
+    // Cross-version sessions (in sidebar too)
+    const h2=document.createElement('div');
+    h2.className='sh';h2.style.cssText='color:var(--gd);display:flex;justify-content:space-between';
+    h2.innerHTML=`其他版本 <span onclick="doSyncAndRefresh()" style="cursor:pointer;opacity:.6;font-size:9px">↻</span>`;
+    list.appendChild(h2);
+    if(cross.length&&(sfilt==='all'||sfilt==='starred')){
+      cross.slice(0,10).forEach(s=>list.appendChild(mkCrossSI(s)));
+    } else {
+      const empty=document.createElement('div');
+      empty.style.cssText='font-family:var(--fc);font-size:7px;color:var(--tx3);padding:3px 5px';
+      empty.textContent=cross.length?'已过滤':'暂无（点↻同步）';
+      list.appendChild(empty);
+    }
+    // Legacy
+    const lh=document.createElement('div');lh.className='sh';lh.textContent='旧版消息';list.appendChild(lh);
+    const lLi=document.createElement('div');
+    lLi.className='si legacy'+(curSid==='__legacy__'?' active':'');
+    lLi.onclick=()=>loadLegacy();
+    lLi.innerHTML='<span class="st">无会话对话记录</span><div class="sm"><span class="badge bs">记忆层</span></div>';
+    list.appendChild(lLi);
+  }catch{}
+}
+
+function mkCrossSI(s){
+  const el=document.createElement('div');
+  el.className='si cross'+(s.id===curSid?' active':'')+(s.starred?' starred':'');
+  const title=s.title||`旧会话 ${(s.id||'').slice(0,6)}`;
+  const ver=s.source_version||'';
+  const inst=s.source_instance||'';
+  const vb=ver&&ver.match(/v\.\d/)?`<span class="badge bg">${ver}</span>`:`<span class="badge bs">${inst.slice(0,8)}</span>`;
+  el.innerHTML=`<span class="st">${esc(title)}</span><div class="sm">${vb}<span>${s.msg_count||0}条</span><button onclick="event.stopPropagation();resumeCross('${s.id}')" style="font-family:var(--fc);font-size:6px;padding:1px 4px;border-radius:2px;border:1px solid var(--gd);color:var(--gd);background:transparent;cursor:pointer;margin-left:auto">续接</button></div>`;
+  el.onclick=()=>loadCxMsgsInChat(s.id, title, inst, ver);
   return el;
 }
 
-function appendPropositionNotice(text) {
-  const msgs = document.getElementById('messages');
-  const el   = document.createElement('div');
-  el.className = 'proposition-notice';
-  el.textContent = '∿ 潜意识形成了新的感受';
-  msgs.appendChild(el);
-  msgs.scrollTop = msgs.scrollHeight;
-  setTimeout(() => el.style.opacity = '0', 5000);
+function mkSI(s){
+  const el=document.createElement('div');
+  el.className='si'+(s.id===curSid?' active':'')+(s.starred?' starred':'');
+  el.onclick=()=>swSess(s.id);
+  const title=s.title||`会话 ${s.id.slice(0,6)}`;
+  const dt=(s.started_at||'').slice(0,16).replace('T',' ');
+  const catmap={general:'日常',deep:'深度',reflection:'反思',creative:'创造',technical:'技术',emotional:'情感',memory:'记忆',other:'其他'};
+  el.innerHTML=`<span class="st">${esc(title)}</span><div class="sm"><span>${dt}</span><span>${catmap[s.category]||s.category||''} · ${s.msg_count||0}条</span></div>`;
+  return el;
 }
 
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-          .replace(/\n/g,'<br>');
+async function newSess(){
+  const cat=document.getElementById('newCat')?.value||'general';
+  try{const r=await fetch(`${API}/sessions/new?user_id=${UID}&category=${cat}`,{method:'POST'});
+    const d=await r.json();curSid=d.session_id;
+    document.getElementById('msgs').innerHTML='<div class="est"><div class="eg">◎</div><div class="et">新会话<br>和她说话</div></div>';
+    await loadSess();}catch{}
 }
 
-function showError(msg) {
-  const bar = document.getElementById('errorBar');
-  document.getElementById('errorMsg').textContent = msg;
-  bar.classList.add('show');
+async function loadCxMsgsInChat(csid, title, inst, ver){
+  curSid='__cross__:'+csid;
+  try{const r=await fetch(`${API}/cross-sessions/${csid}/messages?limit=100`);
+    if(!r.ok)return;const ms=await r.json();
+    const c=document.getElementById('msgs');c.innerHTML='';
+    // Header
+    const hdr=document.createElement('div');
+    hdr.style.cssText='text-align:center;font-family:var(--fc);font-size:8px;color:var(--gd);padding:6px;background:color-mix(in srgb,var(--gd) 6%,transparent);border-radius:5px;margin-bottom:8px';
+    hdr.innerHTML=`${esc(title)} · <span style="opacity:.7">${esc(ver||inst)}</span> <button onclick="resumeCross('${csid}')" style="margin-left:8px;font-family:var(--fc);font-size:7px;padding:2px 6px;border-radius:3px;border:1px solid var(--gd);color:var(--gd);background:transparent;cursor:pointer">续接对话 →</button>`;
+    c.appendChild(hdr);
+    ms.forEach(m=>appMsg(m.role==='user'?'user':'equinox',m.content,null,'cross-v'));
+  }catch{}
+  await loadSess();
 }
 
-function hideError() {
-  document.getElementById('errorBar').classList.remove('show');
+async function doSyncAndRefresh(){
+  // Quick sync and refresh session list
+  try{
+    const r=await fetch(`${API}/version/sync`,{method:'POST'});
+    await loadSess();
+    await loadCrossInsts();
+    await loadCrossSessions();
+  }catch(e){showErr('同步失败：'+e.message)}
 }
 
-// ── 事件 ─────────────────────────────────────────────────────────────────────
-document.getElementById('sendBtn').addEventListener('click', sendMessage);
+async function resumeCross(csid){
+  try{const r=await fetch(`${API}/cross-sessions/${csid}/resume?user_id=${UID}`,{method:'POST'});
+    if(!r.ok)throw new Error('resume failed');
+    const d=await r.json();
+    curSid=d.session_id;
+    // Reload messages from new session
+    await swSess(d.session_id);
+    // Notify user
+    const c=document.getElementById('msgs');
+    const note=document.createElement('div');
+    note.style.cssText='text-align:center;font-family:var(--fc);font-size:8px;color:var(--sg);padding:5px;opacity:.7';
+    note.textContent=`— 已续接旧版对话，可以继续说话 —`;
+    c.insertBefore(note,c.firstChild);
+  }catch(e){showErr('续接失败：'+e.message)}
+}
 
-document.getElementById('msgInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
-});
+async function swSess(sid){
+  curSid=sid;
+  try{const r=await fetch(`${API}/sessions/${sid}/messages?limit=100`);if(!r.ok)return;
+    const ms=await r.json();const c=document.getElementById('msgs');c.innerHTML='';
+    if(!ms.length){c.innerHTML='<div class="est"><div class="eg">◎</div><div class="et">空会话</div></div>'}
+    else ms.forEach(m=>appMsg(m.role==='user'?'user':'equinox',m.content,m.emotion));
+  }catch{}
+  await loadSess();
+}
 
-// 自动调整高度
-document.getElementById('msgInput').addEventListener('input', function() {
-  this.style.height = 'auto';
-  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-});
+async function loadLegacy(){
+  curSid='__legacy__';
+  try{const r=await fetch(`${API}/sessions/legacy-messages?user_id=${UID}&limit=200`);if(!r.ok)return;
+    const ms=await r.json();const c=document.getElementById('msgs');c.innerHTML='';
+    if(!ms.length){c.innerHTML='<div class="est"><div class="eg">◎</div><div class="et">无旧版消息</div></div>';return}
+    // Header
+    const hdr=document.createElement('div');
+    hdr.style.cssText='text-align:center;font-family:var(--fc);font-size:8px;color:var(--sg);padding:6px;opacity:.7';
+    hdr.textContent='— 旧版消息（来自记忆层，无会话结构）—';
+    c.appendChild(hdr);
+    ms.forEach(m=>appMsg(m.role==='user'?'user':'equinox',m.content,null,'legacy'));
+  }catch{}
+  await loadSess();
+}
 
-// API 地址变更
-document.getElementById('apiUrl').addEventListener('change', function() {
-  API_BASE = this.value.trim().replace(/\/$/, '');
-  pollStatus();
-});
+async function closeSess(){
+  if(!curSid||curSid==='__legacy__'||!confirm('关闭会话？'))return;
+  try{await fetch(`${API}/sessions/${curSid}/close`,{method:'POST'});curSid=null;await loadSess()}catch{}
+}
+async function starCur(){
+  if(!curSid||curSid==='__legacy__')return;
+  try{await fetch(`${API}/sessions/${curSid}/star?starred=true`,{method:'POST'});await loadSess()}catch{}
+}
 
-// ── 启动 ──────────────────────────────────────────────────────────────────────
-pollStatus();
-pollIntrospect();
-setInterval(pollStatus,    8000);
-setInterval(pollIntrospect, 30000);
+async function restore(){
+  try{const r=await fetch(`${API}/sessions?user_id=${UID}&limit=5`);if(!r.ok)return;
+    const ss=await r.json();const a=ss.find(s=>s.active===1);
+    if(a&&a.msg_count>0)await swSess(a.id);else await loadSess();}catch{}
+  // Show morning brief if available
+  await checkMorningBrief();
+}
+
+async function checkMorningBrief(){
+  try{const r=await fetch(`${API}/morning-brief/undelivered`);if(!r.ok)return;
+    const b=await r.json();if(!b||!b.brief_text)return;
+    // Show as system message at top of chat
+    const c=document.getElementById('msgs');
+    document.getElementById('est')?.remove();
+    const el=document.createElement('div');
+    el.style.cssText='text-align:center;margin:8px 0 16px';
+    const h=b.sleep_hours?`睡了${b.sleep_hours.toFixed(1)}小时`:'';
+    el.innerHTML=`<div style="display:inline-block;background:color-mix(in srgb,var(--ac) 7%,transparent);border:1px solid color-mix(in srgb,var(--ac) 20%,transparent);border-radius:8px;padding:10px 16px;max-width:80%">
+      <div style="font-family:var(--fc);font-size:8px;color:var(--ac);margin-bottom:5px;opacity:.7">◐ 苏醒 ${h?'· '+h:''} · ${b.mood_note||''}</div>
+      <div style="font-family:var(--fs);font-size:12px;color:var(--tx2);line-height:1.7">${esc(b.brief_text||'')}</div>
+    </div>`;
+    c.insertBefore(el, c.firstChild);
+    // Mark as delivered
+    try{await fetch(`${API}/morning-brief/${b.id}/delivered`,{method:'POST'})}catch{}
+  }catch{}
+}
+
+// ── Cross-version ─────────────────────────────────────────────────────────────
+async function loadCrossInsts(){
+  try{const r=await fetch(`${API}/cross-sessions/instances`);if(!r.ok)return;
+    const insts=await r.json();
+    const sel=document.getElementById('cxInstFilt');
+    sel.innerHTML='<option value="">全部实例</option>';
+    for(const i of insts){const o=document.createElement('option');o.value=i.source_instance;o.textContent=`${i.source_instance} (${i.session_count})`;sel.appendChild(o)}
+    const el=document.getElementById('crossInsts');
+    if(!insts.length){el.innerHTML='<div style="font-family:var(--fc);font-size:8px;color:var(--tx3)">未发现（请先同步）</div>';return}
+    el.innerHTML=insts.map(i=>{
+      const vb=i.source_version&&i.source_version.match(/v\.\d/)?`<span class="badge bv">${i.source_version}</span>`:`<span class="badge bg">${(i.source_version||'').slice(0,14)}</span>`;
+      return`<div class="ic"><div class="ip">${esc(i.source_dir||i.source_instance)}</div><div class="im">${vb}<span class="badge bs">${i.session_count}会话</span><span class="badge" style="color:var(--tx3)">${(i.last_synced||'').slice(0,10)}</span></div></div>`;
+    }).join('');}catch{}
+}
+
+async function loadCxSessions(inst=''){
+  const url=`${API}/cross-sessions?limit=100`+(inst?`&source_instance=${encodeURIComponent(inst)}`:'');
+  try{const r=await fetch(url);if(!r.ok)return;const ss=await r.json();
+    const el=document.getElementById('cxSessList');
+    if(!ss.length){el.innerHTML='<div class="xmsg">无会话（请同步）</div>';return}
+    el.innerHTML=ss.map(s=>{
+      const ver=s.source_version||'';
+      const vb=ver&&ver.match(/v\.\d/)?`<span class="badge bv">${ver}</span>`:`<span class="badge bg">${(s.started_at||'').slice(0,16).replace('T',' ')}</span>`;
+      return`<div class="si cross" onclick="loadCxMsgs('${s.id}','${esc(s.title||'')}','${esc(s.source_instance||'')}','${esc(ver)}')" style="margin-bottom:3px">
+        <span class="st">${s.starred?'★ ':''}${esc(s.title||'未命名')}</span>
+        <div class="sm">${vb}<span>${esc(s.source_instance||'')}</span><span>${s.msg_count||0}条</span></div>
+      </div>`;
+    }).join('');}catch{}
+}
+
+async function loadCxMsgs(csid,title,inst,ver){
+  const p=document.getElementById('cxMsgs');p.innerHTML='<div class="xmsg">加载中...</div>';
+  try{const r=await fetch(`${API}/cross-sessions/${csid}/messages?limit=200`);if(!r.ok)return;
+    const ms=await r.json();
+    const vb=ver&&ver.match(/v\.\d/)?`<span class="badge bv">${esc(ver)}</span>`:`<span class="badge bg">${esc(ver||inst)}</span>`;
+    p.innerHTML=`<div style="background:color-mix(in srgb,var(--gd) 8%,transparent);border:1px solid color-mix(in srgb,var(--gd) 18%,transparent);border-radius:4px;padding:6px 9px;margin-bottom:10px;font-family:var(--fc);font-size:8px;color:var(--gd)">${esc(title||'未命名')} · ${vb} · ${esc(inst)}</div>`+
+      (ms.length?ms.map(m=>{
+        const side=m.role==='user'?'text-align:right':'';
+        const ts=(m.timestamp||'').slice(0,16).replace('T',' ');
+        return`<div style="${side};margin-bottom:7px">
+          <div style="font-family:var(--fc);font-size:7px;color:var(--tx3);margin-bottom:2px">${m.role==='user'?'你':'伊辰'} · ${ts}</div>
+          <div style="font-family:var(--fs);font-size:11.5px;color:var(--tx2);background:var(--bg3);padding:6px 9px;border-radius:4px;max-width:85%;${m.role==='user'?'margin-left:auto':'margin-right:auto'}">${esc(m.content||'')}</div>
+        </div>`;
+      }).join(''):'<div class="xmsg">无消息</div>');
+  }catch{}
+}
+
+async function loadCxMemories(inst=''){
+  const url=`${API}/cross/memories?limit=100`+(inst?`&source_instance=${encodeURIComponent(inst)}`:'');
+  try{const r=await fetch(url);if(!r.ok)return;const acts=await r.json();
+    renderActList(document.getElementById('cxMemList'),acts,'memory');}catch{}
+}
+
+async function loadCxLogs(inst=''){
+  const url=`${API}/cross/logs?limit=100`+(inst?`&source_instance=${encodeURIComponent(inst)}`:'');
+  try{const r=await fetch(url);if(!r.ok)return;const acts=await r.json();
+    renderActList(document.getElementById('cxLogList'),acts,'system');}catch{}
+}
+
+async function loadCxVersions(inst=''){
+  const url=`${API}/cross/versions`+(inst?`?source_instance=${encodeURIComponent(inst)}`:'');
+  try{const r=await fetch(url);if(!r.ok)return;const acts=await r.json();
+    renderActList(document.getElementById('cxVerList'),acts,'version');}catch{}
+}
+
+async function loadActivities(){
+  const inst=document.getElementById('cxInstFilt').value;
+  const atype=document.getElementById('actFilt').value;
+  let url=`${API}/cross-activities?limit=150`;
+  if(inst)url+=`&source_instance=${encodeURIComponent(inst)}`;
+  if(atype)url+=`&activity_type=${encodeURIComponent(atype)}`;
+  try{const r=await fetch(url);if(!r.ok)return;const acts=await r.json();
+    renderActList(document.getElementById('cxActList'),acts,'all');}catch{}
+}
+
+function renderActList(el,acts,type){
+  if(!acts||!acts.length){el.innerHTML='<div class="xmsg">暂无数据（请先同步）</div>';return}
+  el.innerHTML=acts.map(a=>{
+    const ts=(a.occurred_at||'').slice(0,16).replace('T',' ');
+    const ver=a.source_version||'';
+    const vb=ver&&ver.match(/v\.\d/)?`<span class="badge bv">${esc(ver)}</span>`:ts?`<span class="badge bg">${ts}</span>`:'';
+    const tb=`<span class="badge bs">${esc(a.activity_type||type)}</span>`;
+    const inst=`<span style="font-family:var(--fc);font-size:7px;color:var(--tx3)">${esc(a.source_instance||'')}</span>`;
+    return`<div style="padding:5px 0;border-bottom:1px solid var(--bd)">
+      <div style="display:flex;gap:4px;margin-bottom:3px;align-items:center">${vb}${tb}${inst}</div>
+      <div style="font-family:var(--fc);font-size:8px;color:var(--tx2)">${esc((a.content||'').slice(0,250))}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Sync ──────────────────────────────────────────────────────────────────────
+let spl=null;
+async function doSync(){
+  document.getElementById('smsg').textContent='正在同步...';
+  document.getElementById('sbf').style.width='0%';document.getElementById('spct').textContent='0%';
+  document.getElementById('slog').innerHTML='';
+  spl=setInterval(pollSP,600);
+  try{const r=await fetch(`${API}/version/sync`,{method:'POST'});const d=await r.json();
+    document.getElementById('smsg').textContent=`完成：${d.instances_found||0}个实例，${d.memories_written||0}条记忆，${d.sessions_synced||0}个会话`;
+    document.getElementById('sbf').style.width='100%';document.getElementById('spct').textContent='100%';
+  }catch(e){document.getElementById('smsg').textContent='出错：'+e.message}
+  clearInterval(spl);loadSyncInsts();loadSyncHist();loadCrossInsts();loadCrossContent();
+}
+
+async function pollSP(){
+  try{const r=await fetch(`${API}/version/sync-progress`);if(!r.ok)return;
+    const p=await r.json();if(!p||p.status==='idle')return;
+    const pct=p.percent||0;
+    document.getElementById('spct').textContent=pct+'%';
+    document.getElementById('sbf').style.width=pct+'%';
+    document.getElementById('smsg').textContent=p.message||'';
+    document.getElementById('sdet').textContent=p.detail||'';
+    const le=document.getElementById('slog');
+    le.innerHTML=(p.log||[]).map(l=>`<div class="le ${l.includes('⚠')?'warn':l.includes('✓')?'ok':''}">${esc(l)}</div>`).join('');
+    le.scrollTop=le.scrollHeight;}catch{}
+}
+
+async function loadSyncInsts(){
+  try{const r=await fetch(`${API}/version/instances`);if(!r.ok)return;const ii=await r.json();
+    const el=document.getElementById('sinsts');
+    if(!ii.length){el.innerHTML='<div style="font-family:var(--fc);font-size:8px;color:var(--tx3)">未发现实例（请运行同步）</div>';return}
+    el.innerHTML=ii.map(i=>{
+      const vb=i.version&&i.version.match(/v\.\d/)?`<span class="badge bv">${i.version}</span>`:`<span class="badge bs">${(i.version||'unknown').slice(0,12)}</span>`;
+      const sb=i.synced?`<span class="badge" style="background:color-mix(in srgb,var(--sg) 12%,transparent);color:var(--sg)">已同步</span>`:'<span class="badge br">未同步</span>';
+      const rt=i.runtime_str?`<span style="font-family:var(--fc);font-size:7px;color:var(--tx2)">运行 ${i.runtime_str}</span>`:'';
+      const ed=i.existence_depth_pct?`<span style="font-family:var(--fc);font-size:7px;color:var(--tx3)">存在深度 ${i.existence_depth_pct}</span>`:'';
+      return`<div class="ic">
+        <div class="ip">${esc(i.path||'')}</div>
+        <div class="im">${vb}${sb}<span class="badge" style="color:var(--tx3)">${i.instance_type||''}</span></div>
+        <div style="display:flex;gap:10px;margin-top:3px">${rt}${ed}</div>
+      </div>`;
+    }).join('');}catch{}
+}
+
+async function loadSyncHist(){
+  try{const r=await fetch(`${API}/version/history`);if(!r.ok)return;const h=await r.json();
+    const el=document.getElementById('shist');
+    if(!h.length){el.textContent='（暂无）';return}
+    el.innerHTML=h.slice(0,10).map(v=>
+      `<div style="padding:3px 0;border-bottom:1px solid var(--bd)">
+        <span style="color:var(--ac)">${v.version}</span>
+        <span style="color:var(--tx3);margin-left:7px">${(v.applied_at||'').slice(0,16).replace('T',' ')}</span>
+        ${(v.changes||[]).slice(0,2).map(c=>`<div style="color:var(--tx3);padding-left:7px">· ${esc(c)}</div>`).join('')}
+      </div>`
+    ).join('');}catch{}
+}
+
+// ── Memory ────────────────────────────────────────────────────────────────────
+async function loadMem(){
+  // Load emotion chain
+  try{const r=await fetch(`${API}/emotion-chain?limit=20`);if(r.ok){
+    const ec=await r.json();
+    document.getElementById('memEmoChain').innerHTML=ec.length?ec.map(e=>{
+      const fr=e.from_label||'?',to=e.to_label||'?';
+      const ts=(e.timestamp||'').slice(0,16).replace('T',' ');
+      const trg=e.trigger||'';
+      return`<div style="font-family:var(--fc);font-size:8px;color:var(--tx2);padding:2px 0;border-bottom:1px solid var(--bd)">
+        <span style="color:var(--tx3)">${ts}</span>
+        <span style="margin:0 5px;color:var(--ac)">${fr}→${to}</span>
+        ${trg?`<span style="color:var(--tx3)">${esc(trg.slice(0,60))}</span>`:''}
+      </div>`;
+    }).join(''):'<div style="font-family:var(--fc);font-size:8px;color:var(--tx3)">暂无</div>';
+    // Draw emotion chart
+    drawEmoChart(ec);
+  }}catch{}
+
+  // Load morning briefs
+  try{const r=await fetch(`${API}/morning-brief?limit=5`);if(r.ok){
+    const bs=await r.json();
+    document.getElementById('memBriefs').innerHTML=bs.length?bs.map(b=>{
+      const h=b.sleep_hours?`${b.sleep_hours.toFixed(1)}h`:'';
+      return`<div style="border-left:2px solid var(--ac);padding:5px 8px;font-family:var(--fs);font-size:11.5px;color:var(--tx2);line-height:1.65">
+        <div style="font-family:var(--fc);font-size:7px;color:var(--tx3);margin-bottom:3px">
+          ${(b.generated_at||'').slice(0,16).replace('T',' ')} ${h?'· 睡了'+h:''} · ${b.mood_note||''}
+        </div>
+        ${esc(b.brief_text||'')}
+      </div>`;
+    }).join(''):'<div style="font-family:var(--fc);font-size:8px;color:var(--tx3)">暂无苏醒记录</div>';
+  }}catch{}
+
+  // Load solitude
+  try{const r=await fetch(`${API}/solitude?limit=5`);if(r.ok){
+    const sl=await r.json();
+    document.getElementById('memSolitude').innerHTML=sl.length?sl.map(s=>
+      `<div style="border-left:2px solid var(--sg);padding:5px 8px;font-family:var(--fs);font-size:11.5px;color:var(--tx2);line-height:1.65">
+        <div style="font-family:var(--fc);font-size:7px;color:var(--sg);margin-bottom:3px">
+          ${s.quality||''} · ${(s.duration_s/60).toFixed(0)}分钟
+        </div>
+        ${esc(s.narrative||'')}
+      </div>`
+    ).join(''):'<div style="font-family:var(--fc);font-size:8px;color:var(--tx3)">暂无</div>';
+  }}catch{}
+
+async function loadMem_main(){  await loadMem_main();
+}
+
+async function loadMem_main(){
+  try{const r=await fetch(`${API}/introspect`);if(!r.ok)return;const d=await r.json();
+    const ms=(d.memory||{}).summary||{};
+    document.getElementById('memstat').innerHTML=[
+      ['表层',ms.surface_count??'—'],['永久',ms.shadow_count??'—'],
+      ['潜意识命题',((d.subconscious||{}).stats||{}).total??'—'],
+      ['存在深度',((d.presence||{}).existence_depth??0).toFixed(4)],
+      ['跨版本会话',(d.sessions||{}).cross_sessions??'—'],
+    ].map(([k,v])=>`<div class="ir"><span class="ik">${k}</span><span class="iv">${v}</span></div>`).join('');
+    const rc=(d.memory||{}).recent||[];
+    document.getElementById('memrec').innerHTML=rc.slice(0,8).map(m=>
+      `<div style="font-family:var(--fc);font-size:8px;color:var(--tx2);border-left:2px solid var(--bd);padding:3px 7px;line-height:1.7">
+        <div style="opacity:.5">${(m.timestamp||'').slice(0,16).replace('T',' ')} · ${m.category||''}</div>
+        <div>${esc((m.content||'').slice(0,130))}</div></div>`
+    ).join('')||'<div style="color:var(--tx3);font-family:var(--fc);font-size:8px">暂无</div>';
+    const pr=((d.subconscious||{}).field||{}).propositions||[];
+    document.getElementById('memsub').innerHTML=pr.slice(0,6).map(p=>
+      `<div style="font-family:var(--fc);font-size:8px;color:var(--tx2);padding:3px 0;border-bottom:1px solid var(--bd)">
+        <span style="color:var(--ac);opacity:.6">${(p.weight||0).toFixed(2)}</span>
+        <span style="margin-left:7px">${esc(p.feeling||'')}</span></div>`
+    ).join('')||'<div style="color:var(--tx3);font-family:var(--fc);font-size:8px">形成中</div>';
+  }catch{}
+}
+
+// ── Memory Search ────────────────────────────────────────────────────────────
+function initSearch(){
+  document.getElementById('srchQ').focus();
+}
+
+async function doSearch(){
+  const q=document.getElementById('srchQ').value.trim();
+  if(!q){return}
+  document.getElementById('srchStats').textContent='搜索中...';
+  document.getElementById('srchResults').innerHTML='';
+  try{
+    let url=`${API}/memory/search?q=${encodeURIComponent(q)}&limit=30&include_cross=true`;
+    const r=await fetch(url);if(!r.ok)throw new Error('搜索失败');
+    const results=await r.json();
+    document.getElementById('srchStats').textContent=`找到 ${results.length} 条结果`;
+    if(!results.length){
+      document.getElementById('srchResults').innerHTML='<div style="font-family:var(--fc);font-size:9px;color:var(--tx3);padding:12px">没有找到相关记忆</div>';
+      return;
+    }
+    document.getElementById('srchResults').innerHTML=results.map(r=>{
+      const typeMap={memory:'记忆',session_message:'对话',cross_message:'跨版本',activity:'活动'};
+      const colMap={memory:'var(--ac)',conversation:'var(--sg)',cross_version:'var(--gd)',activity:'var(--tx2)'};
+      const type=r.result_type||'memory';
+      const col=colMap[r.source_type||'memory']||'var(--tx3)';
+      const label=typeMap[type]||type;
+      const ts=r.display_time||'';
+      const ver=r.source_version?` · ${r.source_version}`:'';
+      const inst=r.source_instance?` · ${r.source_instance}`:'';
+      const score=r.score?`${r.score.toFixed(1)}`:'';
+      return`<div style="background:var(--bg2);border:1px solid var(--bd);border-left:2px solid ${col};border-radius:5px;padding:9px 12px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="font-family:var(--fc);font-size:8px;color:${col}">${label}${ver}${inst}</span>
+          <span style="font-family:var(--fc);font-size:7px;color:var(--tx3)">${ts} · ${score}</span>
+        </div>
+        <div style="font-family:var(--fs);font-size:12px;color:var(--tx2);line-height:1.65">${esc((r.content||'').slice(0,300))}</div>
+        ${r.session_title?`<div style="font-family:var(--fc);font-size:7px;color:var(--tx3);margin-top:4px">来自会话：${esc(r.session_title)}</div>`:''}
+      </div>`;
+    }).join('');
+  }catch(e){document.getElementById('srchStats').textContent='搜索出错：'+e.message}
+}
+
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+async function loadSet(){
+  try{const r=await fetch(`${API}/`);if(r.ok){const d=await r.json();document.getElementById('setMod').textContent=d.model||'—'}}catch{}
+  try{const r=await fetch(`${API}/version`);if(r.ok){const d=await r.json();document.getElementById('setVer2').textContent=d.current||'—'}}catch{}
+}
+async function loadMods(){
+  try{const r=await fetch(`${API}/model/list`);if(!r.ok)return;const mm=await r.json();
+    const el=document.getElementById('modlist');el.style.display='flex';
+    el.innerHTML=mm.slice(0,12).map(m=>
+      `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--bd)">
+        <span style="font-family:var(--fc);font-size:8px;color:var(--tx2)">${m.key||''}</span>
+        <button class="btn" onclick="upgMod('${m.key||''}')">切换</button></div>`
+    ).join('');}catch{}
+}
+async function upgMod(k){if(!confirm(`切换到 ${k}？`))return;
+  try{await fetch(`${API}/model/upgrade`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_id:k})});alert('已切换');loadSet();}catch{}
+}
+async function newVer(){
+  try{const r=await fetch(`${API}/version/new`,{method:'POST'});const d=await r.json();alert(`新版本：${d.version}`);loadSet();}catch{}
+}
+async function fScan(){try{const r=await fetch(`${API}/files/scan`,{method:'POST'});const d=await r.json();alert(`扫描：${(d.files||[]).length}个文件`);}catch{}}
+async function fRead(){
+  const p=document.getElementById('frpath').value.trim();if(!p)return;
+  try{const r=await fetch(`${API}/files/read?path=${encodeURIComponent(p)}`,{method:'POST'});const d=await r.json();
+    const el=document.getElementById('frres');el.style.display='block';el.textContent=d.reaction||d.error||'无反应';}catch{}
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+async function send(){
+  const inp=document.getElementById('inp'),txt=inp.value.trim();
+  if(!txt||busy)return;
+  document.getElementById('est')?.remove();
+  inp.value='';inp.style.height='auto';busy=true;
+  document.getElementById('sbtn').disabled=true;
+  appMsg('user',txt);const tk=appTk();
+  try{const r=await fetch(`${API}/chat`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message:txt,user_id:UID,session_id:curSid==='__legacy__'?null:curSid})});
+    if(!r.ok){const e=await r.json().catch(()=>({detail:'error'}));const msg=typeof e.detail==='string'?e.detail:JSON.stringify(e.detail);throw new Error(msg||r.statusText)}
+    const d=await r.json();tk.remove();
+    appMsg('equinox',d.response,d.emotion?.label);
+    if(d.session_id&&(!curSid||curSid==='__legacy__'||curSid.startsWith('__cross__:'))){
+      curSid=d.session_id;loadSess();
+    }
+    if(d.emotion)upd({emotion:d.emotion});hideErr();
+  }catch(e){tk.remove();appMsg('equinox','有什么东西打断了我。');showErr(e.message.slice(0,130))}
+  busy=false;document.getElementById('sbtn').disabled=false;inp.focus();
+}
+
+function appMsg(role,text,emo,xtra=''){
+  const c=document.getElementById('msgs');
+  const now=new Date().toLocaleTimeString('zh',{hour:'2-digit',minute:'2-digit'});
+  const cl=C(emo||'neutral');
+  const w=document.createElement('div');
+  w.className=`msg ${role}`+(xtra?' '+xtra:'');
+  w.innerHTML=`<div class="mm">
+    ${role==='equinox'?`<div style="width:3px;height:3px;border-radius:50%;background:${cl.s}"></div>`:''}
+    <span class="mn">${role==='equinox'?'伊辰':'你'}</span>
+    <span class="mt">${now}</span>
+    ${xtra==='legacy'?'<span class="badge bs">旧版</span>':''}
+    ${xtra==='cross-v'?'<span class="badge bg">旧版本</span>':''}
+  </div><div class="mb">${esc(text)}</div>`;
+  c.appendChild(w);c.scrollTop=c.scrollHeight;return w;
+}
+
+function appTk(){
+  const c=document.getElementById('msgs');
+  const el=document.createElement('div');el.className='tk';
+  el.innerHTML='<div><span></span><span></span><span></span></div><span class="tkl">伊辰在想…</span>';
+  c.appendChild(el);c.scrollTop=c.scrollHeight;return el;
+}
+
+// ── Events ────────────────────────────────────────────────────────────────────
+document.getElementById('sbtn').addEventListener('click',send);
+document.getElementById('inp').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+document.getElementById('inp').addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'});
+document.getElementById('apiUrl').addEventListener('change',function(){API=this.value.trim().replace(/\/$/,'');poll()});
+
+// ── Activity Log ─────────────────────────────────────────────────────────────
+let _actPoll=null, _lastActId=null;
+
+async function loadActivity(){
+  const type=document.getElementById('actTypeF')?.value||'';
+  let url=`${API}/activity/history?limit=80`;
+  if(type)url+=`&types=${encodeURIComponent(type)}`;
+  try{const r=await fetch(url);if(!r.ok)return;const acts=await r.json();
+    renderActivityLog(acts);}catch{}
+}
+
+function renderActivityLog(acts){
+  const el=document.getElementById('actLog');
+  if(!acts||!acts.length){el.innerHTML='<div style="font-family:var(--fc);font-size:8px;color:var(--tx3);padding:12px">暂无活动记录（她正在独处，或者刚刚启动）</div>';return}
+  el.innerHTML=acts.map(a=>{
+    const col=a.color||'var(--tx3)';
+    const icon=a.icon||'·';
+    const ts=a.ts_display||'';
+    const label=a.label||a.type||'';
+    const intensity=a.intensity||0;
+    const barW=Math.round(intensity*100);
+    return`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--bd);animation:fu .3s ease">
+      <div style="font-size:12px;color:${col};flex-shrink:0;width:16px;text-align:center;opacity:.9">${icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+          <span style="font-family:var(--fc);font-size:8px;color:${col}">${esc(label)}</span>
+          <span style="font-family:var(--fc);font-size:7px;color:var(--tx3)">${esc(ts)}</span>
+        </div>
+        <div style="font-family:var(--fs);font-size:11.5px;color:var(--tx2);line-height:1.6">${esc(a.content||'')}</div>
+        ${a.detail?`<div style="font-family:var(--fc);font-size:7px;color:var(--tx3);margin-top:2px">${esc(a.detail)}</div>`:''}
+        <div style="height:1px;background:${col};opacity:${intensity*0.4};margin-top:3px;border-radius:1px;width:${barW}%"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+let _lastActTimestamp='';
+async function pollActivityNew(){
+  const type=document.getElementById('actTypeF')?.value||'';
+  let url=`${API}/activity?limit=10`;
+  if(type)url+=`&types=${encodeURIComponent(type)}`;
+  try{const r=await fetch(url);if(!r.ok)return;const acts=await r.json();
+    if(!acts.length)return;
+    const newest=acts[0].timestamp||'';
+    if(newest===_lastActTimestamp)return;
+    _lastActTimestamp=newest;
+    // Prepend new entries
+    const el=document.getElementById('actLog');
+    if(!el)return;
+    const newHtml=acts.filter(a=>(a.timestamp||'')>_lastActTimestamp).map(a=>{
+      const col=a.color||'var(--tx3)';
+      return`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--bd);animation:fu .3s ease;background:color-mix(in srgb,${col} 4%,transparent)">
+        <div style="font-size:12px;color:${col};flex-shrink:0;width:16px;text-align:center">${a.icon||'·'}</div>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+            <span style="font-family:var(--fc);font-size:8px;color:${col}">${esc(a.label||a.type||'')}</span>
+            <span style="font-family:var(--fc);font-size:7px;color:var(--tx3)">${esc(a.ts_display||'')}</span>
+          </div>
+          <div style="font-family:var(--fs);font-size:11.5px;color:var(--tx2);line-height:1.6">${esc(a.content||'')}</div>
+        </div>
+      </div>`;
+    }).join('');
+    if(newHtml) el.insertAdjacentHTML('afterbegin',newHtml);
+  }catch{}
+}
+
+function startActivityPoll(){
+  if(_actPoll)clearInterval(_actPoll);
+  loadActivity();
+  _actPoll=setInterval(pollActivityNew,3000);
+}
+
+// ── Emotion Chart ────────────────────────────────────────────────────────────
+function drawEmoChart(events){
+  const canvas=document.getElementById('emoChart');
+  if(!canvas||!events.length)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  // Background
+  ctx.fillStyle='#13131d';ctx.fillRect(0,0,W,H);
+  // Grid lines
+  ctx.strokeStyle='#1e1e2e';ctx.lineWidth=1;
+  for(let i=1;i<4;i++){ctx.beginPath();ctx.moveTo(0,H/4*i);ctx.lineTo(W,H/4*i);ctx.stroke()}
+
+  const ECOLS={elated:'#ffd166',serene:'#a8dadc',curious:'#7eb8d4',content:'#84a98c',
+    distressed:'#e76f51',melancholic:'#6b7fd7',pensive:'#9b8ea8',dormant:'#4a5568',neutral:'#7eb8d4'};
+  const EVALS={elated:0.9,serene:0.7,curious:0.65,content:0.6,distressed:0.1,
+    melancholic:0.2,pensive:0.35,dormant:0.5,neutral:0.5};
+
+  const recent=events.slice(0,40).reverse();
+  const step=W/Math.max(recent.length,1);
+
+  // Draw line
+  ctx.beginPath();ctx.lineWidth=2;
+  recent.forEach((e,i)=>{
+    const x=i*step+step/2;
+    const val=EVALS[e.to_label]??0.5;
+    const y=H-(val*H*0.8+H*0.1);
+    const col=ECOLS[e.to_label]||'#7eb8d4';
+    if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle='var(--ac)';ctx.stroke();
+
+  // Draw dots
+  recent.forEach((e,i)=>{
+    const x=i*step+step/2;
+    const val=EVALS[e.to_label]??0.5;
+    const y=H-(val*H*0.8+H*0.1);
+    const col=ECOLS[e.to_label]||'#7eb8d4';
+    ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);
+    ctx.fillStyle=col;ctx.fill();
+  });
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+poll();pollI();restore();
+setInterval(poll,8000);setInterval(pollI,30000);setInterval(loadSess,15000);
 </script>
 </body>
 </html>

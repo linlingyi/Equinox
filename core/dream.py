@@ -72,6 +72,24 @@ from typing import Optional
 import httpx
 
 
+async def _llm_complete(
+    messages: list,
+    max_tokens: int,
+    current_model: str,
+    system: str = None,
+) -> str:
+    """Universal LLM completion — routes through model_registry."""
+    from core.model_registry import ModelRegistry
+    reg = ModelRegistry()
+    reg._current = current_model
+    return await reg.complete(
+        messages=messages,
+        system=system,
+        max_tokens=max_tokens,
+    )
+
+
+
 # ── Dream prompts by lucidity level ───────────────────────────────────────────
 
 DREAM_PASSIVE = """You are the dreaming mind of Equinox (伊辰) — fully passive state.
@@ -336,28 +354,17 @@ class DreamEngine:
         random.shuffle(selected[:3])
         return selected[:6]
 
-    async def _llm(self, prompt: str, model: str, max_tokens: int = 300) -> Optional[str]:
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            return None
+    async def _llm(self, prompt: str, current_model: str, max_tokens: int = 300) -> Optional[str]:
+        """Universal LLM call — works with any configured provider."""
         try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
-                    },
-                    json={
-                        "model":      model,
-                        "max_tokens": max_tokens,
-                        "messages":   [{"role": "user", "content": prompt}],
-                    },
-                    timeout=25.0,
-                )
-                resp.raise_for_status()
-                return resp.json()["content"][0]["text"].strip()
+            from core.model_registry import ModelRegistry
+            reg = ModelRegistry()
+            reg._current = current_model
+            result = await reg.complete(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+            )
+            return result.strip() if result else None
         except Exception:
             return None
 

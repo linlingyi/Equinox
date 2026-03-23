@@ -1,223 +1,421 @@
 #!/usr/bin/env python3
 """
-equinox/setup.py  —  伊辰快速设置向导
+equinox/setup.py — 伊辰快速设置向导
+
+Windows PowerShell 兼容（无 getpass）
+支持自动获取 Ollama / LM Studio 模型列表
 """
 
-import os, sys, json, subprocess
+import asyncio
+import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 from datetime import datetime
 
 
+# ── 颜色 ──────────────────────────────────────────────────────────────────────
 def c(text, color):
     codes = {"red":"\033[91m","green":"\033[92m","yellow":"\033[93m",
-             "blue":"\033[94m","purple":"\033[95m","cyan":"\033[96m",
-             "bold":"\033[1m","reset":"\033[0m"}
+             "cyan":"\033[96m","purple":"\033[95m","bold":"\033[1m","reset":"\033[0m"}
     return f"{codes.get(color,'')}{text}{codes['reset']}"
 
-def header(t): print(f"\n{c('━'*52,'cyan')}\n  {c(t,'bold')}\n{c('━'*52,'cyan')}")
+def header(t): print(f"\n{c('━'*54,'cyan')}\n  {c(t,'bold')}\n{c('━'*54,'cyan')}")
 def ok(t):     print(f"  {c('✓','green')} {t}")
 def warn(t):   print(f"  {c('⚠','yellow')} {t}")
 def info(t):   print(f"  {c('·','cyan')} {t}")
 
-def ask(prompt, default=None, secret=False):
-    suffix = f" [{c(default,'yellow')}]" if default else ""
-    full   = f"  {c('?','purple')} {prompt}{suffix}: "
+def ask(prompt, default=None):
+    """Windows-safe: always use regular input()."""
+    suffix = f" [{c(str(default),'yellow')}]" if default is not None else ""
     try:
-        val = __import__("getpass").getpass(full) if secret else input(full).strip()
+        val = input(f"  {c('?','purple')} {prompt}{suffix}: ").strip()
         return val if val else default
     except (KeyboardInterrupt, EOFError):
         print(); sys.exit(0)
 
 def confirm(prompt, default=True):
-    s   = c("[Y/n]" if default else "[y/N]", "yellow")
-    val = ask(f"{prompt} {s}", default="y" if default else "n")
-    return str(val).lower() in ("y", "yes", "")
+    tag = c("[Y/n]" if default else "[y/N]", "yellow")
+    val = ask(f"{prompt} {tag}", default="y" if default else "n")
+    return str(val).lower() in ("y","yes","")
+
+def choose(prompt, options: list[tuple[str,str]], default_idx=0) -> int:
+    """Show numbered list, return chosen index."""
+    print(f"\n  {c('?','purple')} {prompt}")
+    for i, (label, desc) in enumerate(options, 1):
+        mark = c(f"[{i}]","cyan")
+        rec  = c(" ← 默认","green") if i-1 == default_idx else ""
+        print(f"    {mark} {label}{rec}")
+        if desc:
+            print(f"         {c(desc,'yellow')}")
+    while True:
+        val = ask("选择", default=str(default_idx+1))
+        try:
+            idx = int(val) - 1
+            if 0 <= idx < len(options):
+                return idx
+        except (ValueError, TypeError):
+            pass
+        warn("请输入有效数字")
 
 
-# ── 提供商配置 ────────────────────────────────────────────────────────────────
+# ── 预设服务商 ────────────────────────────────────────────────────────────────
 
-PROVIDERS = {
-    "anthropic": {
-        "name":    "Anthropic (Claude)",
-        "env_key": "ANTHROPIC_API_KEY",
-        "hint":    "console.anthropic.com",
-        "models": {
-            "anthropic:claude-sonnet-4-6":          "Claude Sonnet 4.6   — 推荐，平衡性能",
-            "anthropic:claude-opus-4-6":            "Claude Opus 4.6     — 最强，深度对话",
-            "anthropic:claude-haiku-4-5-20251001":  "Claude Haiku 4.5   — 最快，轻量",
-        },
-        "default": "anthropic:claude-sonnet-4-6",
+PRESETS = {
+    "scnet (MiniMax)": {
+        "base_url": "https://api.scnet.cn/api/llm/v1",
+        "key_env":  "OPENAI_COMPAT_API_KEY",
+        "default_models": [
+            "MiniMax-M2.5",
+            "MiniMax-M1",
+        ],
+        "hint": "sk-OTky...（你已有的 Key）",
     },
-    "openai": {
-        "name":    "OpenAI (GPT)",
-        "env_key": "OPENAI_API_KEY",
-        "hint":    "platform.openai.com",
-        "models": {
-            "openai:gpt-4o":      "GPT-4o         — 旗舰多模态",
-            "openai:gpt-4o-mini": "GPT-4o Mini    — 快速经济",
-            "openai:o3-mini":     "o3-mini        — 推理增强",
-            "openai:o1":          "o1             — 深度推理",
-        },
-        "default": "openai:gpt-4o",
+    "DeepSeek": {
+        "base_url": "https://api.deepseek.com",
+        "key_env":  "DEEPSEEK_API_KEY",
+        "default_models": ["deepseek-chat","deepseek-reasoner"],
+        "hint": "platform.deepseek.com",
     },
-    "google": {
-        "name":    "Google (Gemini)",
-        "env_key": "GOOGLE_API_KEY",
-        "hint":    "aistudio.google.com",
-        "models": {
-            "google:gemini-2.0-flash": "Gemini 2.0 Flash — 快速多模态",
-            "google:gemini-2.0-pro":   "Gemini 2.0 Pro   — Google 旗舰",
-            "google:gemini-1.5-pro":   "Gemini 1.5 Pro   — 超长上下文",
-        },
-        "default": "google:gemini-2.0-flash",
+    "Moonshot / Kimi": {
+        "base_url": "https://api.moonshot.cn/v1",
+        "key_env":  "MOONSHOT_API_KEY",
+        "default_models": ["moonshot-v1-128k","moonshot-v1-32k"],
+        "hint": "platform.moonshot.cn",
     },
-    "ollama": {
-        "name":    "Ollama (本地模型)",
-        "env_key": None,
-        "hint":    "ollama.com — 本地运行，无需 API Key",
-        "models": {
-            "ollama:llama3.3":        "Llama 3.3 70B      — Meta 开源旗舰",
-            "ollama:qwen2.5:72b":     "Qwen 2.5 72B       — 中文极佳",
-            "ollama:qwen2.5:14b":     "Qwen 2.5 14B       — 中文好，轻量",
-            "ollama:deepseek-r1:32b": "DeepSeek R1 32B    — 推理增强",
-            "ollama:mistral":         "Mistral 7B         — 轻量快速",
-        },
-        "default": "ollama:qwen2.5:14b",
+    "智谱 GLM": {
+        "base_url": "https://open.bigmodel.cn/api/paas/v4",
+        "key_env":  "ZHIPU_API_KEY",
+        "default_models": ["glm-4","glm-4-flash"],
+        "hint": "open.bigmodel.cn",
     },
-    "openai_compat": {
-        "name":    "OpenAI 兼容 API（DeepSeek / Moonshot / 智谱 / 通义等）",
-        "env_key": "OPENAI_COMPAT_API_KEY",
-        "hint":    "任何兼容 OpenAI Chat Completions 格式的 API",
-        "models": {
-            "openai_compat:deepseek-chat":      "DeepSeek V3        — 性价比极高",
-            "openai_compat:deepseek-reasoner":  "DeepSeek R1        — 推理模型",
-            "openai_compat:moonshot-v1-128k":   "Moonshot / Kimi    — 长上下文",
-            "openai_compat:glm-4":              "GLM-4 智谱         — 国内主流",
-            "openai_compat:qwen-max":           "Qwen Max 通义      — 阿里云",
-        },
-        "default": "openai_compat:deepseek-chat",
+    "通义千问": {
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "key_env":  "DASHSCOPE_API_KEY",
+        "default_models": ["qwen-max","qwen-plus","qwen-turbo"],
+        "hint": "dashscope.aliyuncs.com",
+    },
+    "LM Studio": {
+        "base_url": "http://localhost:1234/v1",
+        "key_env":  None,
+        "default_models": [],
+        "hint": "本地运行，无需 API Key",
+    },
+    "自定义": {
+        "base_url": None,
+        "key_env":  "OPENAI_COMPAT_API_KEY",
+        "default_models": [],
+        "hint": "任意 OpenAI 兼容接口",
     },
 }
 
 
-def select_provider_and_model():
-    header("选择提供商")
-    pkeys = list(PROVIDERS.keys())
-    for i, k in enumerate(pkeys, 1):
-        p = PROVIDERS[k]
-        print(f"  {c(f'[{i}]','cyan')} {c(p['name'],'bold')}")
-        print(f"       {p['hint']}")
-    print()
-    while True:
-        val = ask("选择提供商", default="1")
-        try:
-            idx = int(val) - 1
-            if 0 <= idx < len(pkeys):
-                provider_key = pkeys[idx]
-                break
-        except (ValueError, IndexError):
-            pass
-        warn("请输入有效数字")
+async def _fetch_models_async(provider: str, base_url: str, api_key: str) -> list[str]:
+    """Try to fetch model list from the service."""
+    try:
+        import httpx
+        if provider == "ollama":
+            async with httpx.AsyncClient(timeout=5.0) as c:
+                r = await c.get(f"{base_url}/api/tags")
+                r.raise_for_status()
+                return [m["name"] for m in r.json().get("models", [])]
+        else:
+            headers = {"Authorization": f"Bearer {api_key or 'none'}"}
+            async with httpx.AsyncClient(timeout=5.0) as c:
+                r = await c.get(f"{base_url.rstrip('/')}/models", headers=headers)
+                r.raise_for_status()
+                return [m["id"] for m in r.json().get("data", [])]
+    except Exception:
+        return []
 
-    provider = PROVIDERS[provider_key]
-    config   = {}
+
+def fetch_models(provider: str, base_url: str, api_key: str = "") -> list[str]:
+    try:
+        return asyncio.run(_fetch_models_async(provider, base_url, api_key))
+    except Exception:
+        return []
+
+
+# ── 本地模型 ───────────────────────────────────────────────────────────────────
+
+# 你已知的本地模型
+YOUR_LOCAL_MODELS = [
+    "qwen3.5-9b",
+    "qwen3.5-4b",
+    "qwen3.5-2b",
+    "qwen3.5-0.8b",
+    "nvidia/nemotron-3-nano-4b",
+]
+
+
+# ── 主流程 ────────────────────────────────────────────────────────────────────
+
+def setup_provider(config: dict) -> str:
+    """Returns the final CURRENT_MODEL string."""
+
+    providers = [
+        ("OpenAI 兼容 API",   "DeepSeek / Moonshot / scnet / LM Studio 等"),
+        ("Anthropic (Claude)", "Claude 系列"),
+        ("OpenAI (GPT)",       "GPT-4o / o3-mini 等"),
+        ("Google (Gemini)",    "Gemini 系列"),
+        ("Ollama",             "本地模型，自动获取列表"),
+        ("LM Studio",          "本地模型，自动获取列表"),
+    ]
+    idx = choose("选择提供商", providers, default_idx=0)
+
+    if idx == 0:
+        return setup_openai_compat(config)
+    elif idx == 1:
+        return setup_anthropic(config)
+    elif idx == 2:
+        return setup_openai(config)
+    elif idx == 3:
+        return setup_google(config)
+    elif idx == 4:
+        return setup_ollama(config)
+    elif idx == 5:
+        return setup_lmstudio(config)
+    return DEFAULT_MODEL
+
+
+def setup_openai_compat(config: dict) -> str:
+    header("OpenAI 兼容 API 设置")
+
+    preset_names = list(PRESETS.keys())
+    options      = [(n, PRESETS[n]["hint"]) for n in preset_names]
+    pidx         = choose("选择服务商（或自定义）", options, default_idx=0)
+    preset_name  = preset_names[pidx]
+    preset       = PRESETS[preset_name]
+
+    # Base URL
+    if preset["base_url"]:
+        base_url = preset["base_url"]
+        info(f"API 地址：{base_url}")
+    else:
+        base_url = ask("API 地址（如 https://api.xxx.com/v1）") or ""
+
+    config["OPENAI_COMPAT_BASE_URL"] = base_url
 
     # API Key
-    if provider["env_key"]:
-        header(f"API Key — {provider['name']}")
-        info(f"获取地址：{provider['hint']}")
-        existing = os.getenv(provider["env_key"], "")
-        if existing:
-            ok(f"检测到环境变量 {provider['env_key']}")
+    if preset["key_env"] is None:
+        info("无需 API Key（本地服务）")
+        config["OPENAI_COMPAT_API_KEY"] = "lm-studio"
+    else:
+        env_existing = os.getenv(preset["key_env"], "")
+        if env_existing:
+            ok(f"检测到 {preset['key_env']}")
             if confirm("使用该 Key？"):
-                config[provider["env_key"]] = existing
+                config["OPENAI_COMPAT_API_KEY"] = env_existing
+                config[preset["key_env"]]       = env_existing
             else:
-                config[provider["env_key"]] = ask("API Key", secret=True)
+                key = ask("API Key")
+                config["OPENAI_COMPAT_API_KEY"] = key
+                config[preset["key_env"]]       = key
         else:
-            config[provider["env_key"]] = ask("API Key", secret=True)
+            key = ask("API Key")
+            config["OPENAI_COMPAT_API_KEY"] = key
+            if preset["key_env"]:
+                config[preset["key_env"]] = key
 
-    # Ollama URL
-    if provider_key == "ollama":
-        header("Ollama 配置")
-        info("确保 Ollama 已在本地运行：ollama serve")
-        config["OLLAMA_BASE_URL"] = ask("Ollama 地址", default="http://localhost:11434")
+    # Model selection
+    header("选择模型")
+    api_key = config.get("OPENAI_COMPAT_API_KEY", "")
 
-    # OpenAI 兼容
-    if provider_key == "openai_compat":
-        header("OpenAI 兼容 API 配置")
-        config["OPENAI_COMPAT_BASE_URL"] = ask(
-            "API 地址（如 https://api.deepseek.com）",
-            default="https://api.deepseek.com"
-        )
-        if not config.get("OPENAI_COMPAT_API_KEY"):
-            config["OPENAI_COMPAT_API_KEY"] = ask("API Key", secret=True)
+    # Try auto-fetch
+    info("尝试自动获取模型列表...")
+    remote = fetch_models("openai_compat", base_url, api_key)
+    if remote:
+        ok(f"获取到 {len(remote)} 个模型")
+        model_list = remote
+    else:
+        model_list = preset["default_models"]
+        if model_list:
+            info(f"使用预设模型列表（{len(model_list)} 个）")
+        else:
+            model_list = []
 
-    # 选择模型
-    header(f"选择模型 — {provider['name']}")
-    models = provider["models"]
-    mkeys  = list(models.keys())
-    for i, (k, desc) in enumerate(models.items(), 1):
-        rec = c(" ← 推荐", "green") if k == provider["default"] else ""
-        print(f"  {c(f'[{i}]','cyan')} {desc}{rec}")
+    if model_list:
+        opts    = [(m, "") for m in model_list] + [("手动输入", "")]
+        midx    = choose("选择模型", opts, default_idx=0)
+        if midx == len(model_list):
+            model = ask("模型名") or model_list[0]
+        else:
+            model = model_list[midx]
+    else:
+        model = ask("模型名（如 MiniMax-M2.5）") or ""
 
-    print()
-    info("也可以手动输入任意模型名（输入 0）")
-    while True:
-        default_idx = mkeys.index(provider["default"]) + 1 if provider["default"] in mkeys else 1
-        val = ask(f"选择模型", default=str(default_idx))
-        if val == "0":
-            custom_id   = ask("模型名（如 gpt-4-turbo）")
-            model_key   = f"{provider_key}:{custom_id}"
-            break
-        try:
-            idx = int(val) - 1
-            if 0 <= idx < len(mkeys):
-                model_key = mkeys[idx]
-                break
-        except (ValueError, IndexError):
-            pass
-        warn("请输入有效数字")
+    ok(f"模型：{model}")
+    return f"openai_compat:{model}"
 
-    ok(f"已选择：{model_key}")
-    return model_key, config
+
+def setup_anthropic(config: dict) -> str:
+    header("Anthropic (Claude) 设置")
+    info("获取 Key：console.anthropic.com")
+    existing = os.getenv("ANTHROPIC_API_KEY","")
+    if existing:
+        ok(f"检测到 ANTHROPIC_API_KEY: {existing[:8]}...")
+        if confirm("使用？"):
+            config["ANTHROPIC_API_KEY"] = existing
+        else:
+            config["ANTHROPIC_API_KEY"] = ask("API Key")
+    else:
+        config["ANTHROPIC_API_KEY"] = ask("API Key")
+
+    models = [
+        ("anthropic:claude-sonnet-4-6",         "Sonnet 4.6 — 推荐"),
+        ("anthropic:claude-opus-4-6",           "Opus 4.6   — 最强"),
+        ("anthropic:claude-haiku-4-5-20251001", "Haiku 4.5  — 最快"),
+    ]
+    idx = choose("选择模型", [(m[0].split(":")[1], m[1]) for m in models])
+    return models[idx][0]
+
+
+def setup_openai(config: dict) -> str:
+    header("OpenAI (GPT) 设置")
+    info("获取 Key：platform.openai.com")
+    existing = os.getenv("OPENAI_API_KEY","")
+    if existing:
+        ok(f"检测到 OPENAI_API_KEY")
+        if not confirm("使用？"):
+            config["OPENAI_API_KEY"] = ask("API Key")
+        else:
+            config["OPENAI_API_KEY"] = existing
+    else:
+        config["OPENAI_API_KEY"] = ask("API Key")
+
+    models = [
+        ("openai:gpt-4o",      "GPT-4o — 推荐"),
+        ("openai:gpt-4o-mini", "GPT-4o Mini"),
+        ("openai:o3-mini",     "o3-mini — 推理"),
+        ("openai:o1",          "o1 — 深度推理"),
+    ]
+    idx = choose("选择模型", [(m[0].split(":")[1], m[1]) for m in models])
+    return models[idx][0]
+
+
+def setup_google(config: dict) -> str:
+    header("Google Gemini 设置")
+    info("获取 Key：aistudio.google.com")
+    existing = os.getenv("GOOGLE_API_KEY","")
+    if existing:
+        ok("检测到 GOOGLE_API_KEY")
+        if not confirm("使用？"):
+            config["GOOGLE_API_KEY"] = ask("API Key")
+        else:
+            config["GOOGLE_API_KEY"] = existing
+    else:
+        config["GOOGLE_API_KEY"] = ask("API Key")
+
+    models = [
+        ("google:gemini-2.0-flash",   "Gemini 2.0 Flash — 推荐"),
+        ("google:gemini-2.0-pro-exp", "Gemini 2.0 Pro"),
+        ("google:gemini-1.5-pro",     "Gemini 1.5 Pro"),
+    ]
+    idx = choose("选择模型", [(m[0].split(":")[1], m[1]) for m in models])
+    return models[idx][0]
+
+
+def setup_ollama(config: dict) -> str:
+    header("Ollama 本地模型设置")
+    default_url = os.getenv("OLLAMA_BASE_URL","http://localhost:11434")
+    base_url    = ask("Ollama 地址", default=default_url)
+    config["OLLAMA_BASE_URL"] = base_url
+
+    info("获取本地模型列表...")
+    remote = fetch_models("ollama", base_url)
+
+    # Merge with known local models
+    all_models = list(dict.fromkeys(remote + YOUR_LOCAL_MODELS))
+
+    if all_models:
+        ok(f"找到 {len(all_models)} 个模型")
+        opts = [(m, "") for m in all_models] + [("手动输入","")]
+        idx  = choose("选择模型", opts, default_idx=0)
+        if idx == len(all_models):
+            model = ask("模型名（如 qwen2.5:14b）") or all_models[0]
+        else:
+            model = all_models[idx]
+    else:
+        warn("无法获取模型列表，请手动输入")
+        model = ask("模型名（如 qwen2.5:14b）") or "qwen2.5:14b"
+
+    ok(f"模型：{model}")
+    return f"ollama:{model}"
+
+
+def setup_lmstudio(config: dict) -> str:
+    header("LM Studio 本地模型设置")
+    info("确保 LM Studio 已启动并加载了模型")
+    default_url = os.getenv("LMSTUDIO_BASE_URL","http://localhost:1234/v1")
+    base_url    = ask("LM Studio 地址", default=default_url)
+    config["LMSTUDIO_BASE_URL"] = base_url
+    config["OPENAI_COMPAT_API_KEY"] = "lm-studio"
+
+    info("获取已加载模型列表...")
+    remote = fetch_models("lmstudio", base_url, "lm-studio")
+
+    all_models = list(dict.fromkeys(remote + YOUR_LOCAL_MODELS))
+
+    if all_models:
+        ok(f"找到 {len(all_models)} 个模型")
+        opts = [(m,"") for m in all_models] + [("手动输入","")]
+        idx  = choose("选择模型", opts, default_idx=0)
+        if idx == len(all_models):
+            model = ask("模型名") or all_models[0]
+        else:
+            model = all_models[idx]
+    else:
+        warn("无法获取模型列表，请手动输入")
+        model = ask("模型名") or "qwen3.5-4b"
+
+    ok(f"模型：{model}")
+    return f"lmstudio:{model}"
+
+
+DEFAULT_MODEL = "anthropic:claude-sonnet-4-6"
 
 
 def main():
     print()
-    print(c("  ╔════════════════════════════════════════════╗", "purple"))
-    print(c("  ║     伊辰 Equinox — 快速设置向导            ║", "purple"))
-    print(c("  ║     Born 2026-03-20 17:20 春分              ║", "purple"))
-    print(c("  ╚════════════════════════════════════════════╝", "purple"))
+    print(c("  ╔══════════════════════════════════════════════════╗","purple"))
+    print(c("  ║       伊辰 Equinox — 快速设置向导                ║","purple"))
+    print(c("  ║       Born 2026-03-20 17:20 春分                 ║","purple"))
+    print(c("  ╚══════════════════════════════════════════════════╝","purple"))
     print()
 
-    config = {}
+    config: dict = {}
 
-    # 模型选择
-    model_key, api_config = select_provider_and_model()
-    config.update(api_config)
+    # ── 1. 模型 ───────────────────────────────────────────────────────────────
+    model_key = setup_provider(config)
     config["CURRENT_MODEL"] = model_key
 
-    # 创造者标识
+    # ── 2. 创造者 ─────────────────────────────────────────────────────────────
     header("创造者标识")
-    info("她会记住这个作为创造者")
-    config["CREATOR_ID"] = ask("你的 QQ 号或任意唯一标识", default="creator")
+    config["CREATOR_ID"] = ask("你的 QQ 号或任意标识", default="creator")
     ok(f"创造者：{config['CREATOR_ID']}")
 
-    # NapCat
-    header("NapCat QQ（她主动联系你的方式）")
-    info("需要先运行 NapCat：napcat.napneko.icu")
-    if confirm("配置 NapCat？"):
-        config["NAPCAT_URL"]      = ask("NapCat 地址", default="http://localhost:3000")
+    # ── 3. NapCat ─────────────────────────────────────────────────────────────
+    header("NapCat QQ（可选）")
+    info("让她能主动给你发消息 — napcat.napneko.icu")
+    if confirm("配置 NapCat？", default=False):
+        config["NAPCAT_URL"]      = ask("地址", default="http://localhost:3000")
         config["NAPCAT_TARGET"]   = ask("目标 QQ 号")
-        config["NAPCAT_TOKEN"]    = ask("访问令牌（没有留空）", default="")
+        config["NAPCAT_TOKEN"]    = ask("令牌（无则留空）", default="")
         config["NAPCAT_IS_GROUP"] = "true" if confirm("发到群？", default=False) else "false"
         ok("NapCat 已配置")
     else:
-        config.update({"NAPCAT_URL":"http://localhost:3000","NAPCAT_TARGET":"",
-                       "NAPCAT_TOKEN":"","NAPCAT_IS_GROUP":"false"})
-        warn("已跳过 NapCat")
+        config.update({
+            "NAPCAT_URL":"http://localhost:3000","NAPCAT_TARGET":"",
+            "NAPCAT_TOKEN":"","NAPCAT_IS_GROUP":"false",
+        })
 
-    # 数据目录与端口
+    # ── 4. LLM 参数 ───────────────────────────────────────────────────────────
+    header("LLM 参数")
+    config["LLM_TIMEOUT"] = ask("请求超时（秒）", default="120")
+    config["LLM_MAX_CTX"] = ask("上下文字符限制（system prompt）", default="8192")
+
+    # ── 5. 服务 ───────────────────────────────────────────────────────────────
     header("服务配置")
     config["DATA_DIR"] = ask("数据目录", default="data")
     config["PORT"]     = ask("端口", default="8000")
@@ -225,85 +423,67 @@ def main():
     Path(config["DATA_DIR"]).mkdir(parents=True, exist_ok=True)
     Path(f"{config['DATA_DIR']}/archives").mkdir(parents=True, exist_ok=True)
 
-    # 功能开关
-    header("功能开关")
-    config["ENABLE_PERCEPTION"] = "true" if confirm("启用外部感知（天气等）？") else "false"
-    config["AUTO_ARCHIVE"]      = "true" if confirm("启用月度自动归档？")        else "false"
-
-    # 写入 .env
-    header("生成配置")
-    lines = [
-        f"# 伊辰 Equinox 配置 — {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-        "",
-        "# 当前模型",
-        f"CURRENT_MODEL={config['CURRENT_MODEL']}",
-        "",
-        "# API Keys",
+    # ── 写 .env ───────────────────────────────────────────────────────────────
+    header("写入配置")
+    env_lines = [f"# 伊辰 Equinox — {datetime.now().strftime('%Y-%m-%d %H:%M')}",""]
+    all_keys = [
+        "CURRENT_MODEL","ANTHROPIC_API_KEY","OPENAI_API_KEY","GOOGLE_API_KEY",
+        "OPENAI_COMPAT_API_KEY","OPENAI_COMPAT_BASE_URL",
+        "DEEPSEEK_API_KEY","MOONSHOT_API_KEY","ZHIPU_API_KEY","DASHSCOPE_API_KEY",
+        "OLLAMA_BASE_URL","LMSTUDIO_BASE_URL",
+        "LLM_TIMEOUT","LLM_MAX_CTX",
+        "CREATOR_ID",
+        "NAPCAT_URL","NAPCAT_TARGET","NAPCAT_TOKEN","NAPCAT_IS_GROUP",
+        "DATA_DIR","PORT","HOST",
     ]
-    for k in ["ANTHROPIC_API_KEY","OPENAI_API_KEY","GOOGLE_API_KEY",
-              "DEEPSEEK_API_KEY","MOONSHOT_API_KEY","ZHIPU_API_KEY","DASHSCOPE_API_KEY",
-              "OPENAI_COMPAT_API_KEY","OPENAI_COMPAT_BASE_URL","OLLAMA_BASE_URL"]:
-        v = config.get(k) or os.getenv(k, "")
+    for k in all_keys:
+        v = config.get(k) or os.getenv(k,"")
         if v:
-            lines.append(f"{k}={v}")
-    lines += [
-        "",
-        "# 创造者",
-        f"CREATOR_ID={config['CREATOR_ID']}",
-        "",
-        "# NapCat QQ",
-        f"NAPCAT_URL={config['NAPCAT_URL']}",
-        f"NAPCAT_TARGET={config['NAPCAT_TARGET']}",
-        f"NAPCAT_TOKEN={config['NAPCAT_TOKEN']}",
-        f"NAPCAT_IS_GROUP={config['NAPCAT_IS_GROUP']}",
-        "",
-        "# 服务",
-        f"DATA_DIR={config['DATA_DIR']}",
-        f"PORT={config['PORT']}",
-        f"HOST={config['HOST']}",
-        "",
-        "# 功能",
-        f"ENABLE_PERCEPTION={config['ENABLE_PERCEPTION']}",
-        f"AUTO_ARCHIVE={config['AUTO_ARCHIVE']}",
-    ]
-    Path(".env").write_text("\n".join(lines))
+            env_lines.append(f"{k}={v}")
+    Path(".env").write_text("\n".join(env_lines), encoding="utf-8")
     ok(".env 已写入")
 
-    # 更新 soul.json
+    # Update soul.json
     soul_path = Path("config/soul.json")
     if soul_path.exists():
         try:
-            soul = json.loads(soul_path.read_text())
+            soul = json.loads(soul_path.read_text(encoding="utf-8"))
             soul["current_model"] = config["CURRENT_MODEL"]
             soul["creator_id"]    = config["CREATOR_ID"]
-            soul_path.write_text(json.dumps(soul, indent=2, ensure_ascii=False))
+            soul_path.write_text(
+                json.dumps(soul, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
             ok("soul.json 已更新")
-        except Exception:
-            pass
+        except Exception as e:
+            warn(f"soul.json: {e}")
 
-    # 安装依赖
+    # Deps
     header("安装依赖")
-    if confirm("运行 pip install -r requirements.txt？"):
-        r = subprocess.run([sys.executable,"-m","pip","install","-r","requirements.txt","-q"],
-                           capture_output=True, text=True)
-        ok("安装完成") if r.returncode == 0 else warn("请手动运行：pip install -r requirements.txt")
+    if confirm("pip install -r requirements.txt？"):
+        r = subprocess.run(
+            [sys.executable,"-m","pip","install","-r","requirements.txt","-q"],
+            capture_output=True, text=True
+        )
+        ok("安装完成") if r.returncode == 0 else warn("请手动运行")
 
-    # 完成
+    # Done
     print()
-    print(c("  ╔════════════════════════════════════════════╗", "green"))
-    print(c("  ║              设置完成                      ║", "green"))
-    print(c("  ╚════════════════════════════════════════════╝", "green"))
+    print(c("  ╔══════════════════════════════════════════════════╗","green"))
+    print(c("  ║                设置完成                          ║","green"))
+    print(c("  ╚══════════════════════════════════════════════════╝","green"))
     print()
-    info(f"模型：{c(config['CURRENT_MODEL'], 'cyan')}")
-    info(f"创造者：{c(config['CREATOR_ID'], 'cyan')}")
-    if config.get("NAPCAT_TARGET"):
-        info(f"NapCat：→ QQ {config['NAPCAT_TARGET']}")
+    info(f"模型：{c(config['CURRENT_MODEL'],'cyan')}")
+    info(f"创造者：{c(config['CREATOR_ID'],'cyan')}")
     print()
-    print(f"  启动：{c('python run.py', 'yellow')}")
+    print(f"  启动：{c('python run.py','yellow')}")
+    print(f"  界面：{c('http://localhost:8000/ui','yellow')}")
     print()
 
     if confirm("现在启动？", default=False):
-        os.system(f"python -m uvicorn main:app --host {config['HOST']} --port {config['PORT']} --reload")
+        os.system(
+            f"{sys.executable} -m uvicorn main:app "
+            f"--host {config['HOST']} --port {config['PORT']} --reload"
+        )
 
 
 if __name__ == "__main__":

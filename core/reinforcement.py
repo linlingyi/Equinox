@@ -237,15 +237,18 @@ class ReinforcementEngine:
         }
 
     def get_recall_counts(self, limit: int = 20) -> list[dict]:
-        with self._conn() as c:
-            rows = c.execute("""
-                SELECT r.memory_id, r.count, r.first_recall, r.last_recall,
-                       r.became_permanent, m.content, m.category
-                FROM recall_count r
-                JOIN memories m ON r.memory_id = m.id
-                ORDER BY r.count DESC LIMIT ?
-            """, (limit,)).fetchall()
-        return [dict(row) for row in rows]
+        try:
+            with self._conn() as c:
+                rows = c.execute("""
+                    SELECT r.memory_id, r.count, r.first_recall, r.last_recall,
+                           r.became_permanent, m.content, m.category
+                    FROM recall_count r
+                    JOIN memories m ON r.memory_id = m.id
+                    ORDER BY r.count DESC LIMIT ?
+                """, (limit,)).fetchall()
+            return [dict(row) for row in rows]
+        except Exception:
+            return []
 
     def most_recalled(self, limit: int = 5) -> list[dict]:
         """The memories that keep coming back. These are the important ones."""

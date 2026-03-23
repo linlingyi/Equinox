@@ -27,6 +27,24 @@ from typing import Optional
 import httpx
 
 
+async def _llm_complete(
+    messages: list,
+    max_tokens: int,
+    current_model: str,
+    system: str = None,
+) -> str:
+    """Universal LLM completion — routes through model_registry."""
+    from core.model_registry import ModelRegistry
+    reg = ModelRegistry()
+    reg._current = current_model
+    return await reg.complete(
+        messages=messages,
+        system=system,
+        max_tokens=max_tokens,
+    )
+
+
+
 SCHEMA_DEPTH = """
 CREATE TABLE IF NOT EXISTS relationship_texture (
     id          TEXT PRIMARY KEY,
@@ -125,37 +143,18 @@ class RelationshipDepth:
         prev = self.get_latest_texture(user_id)
         prev_text = prev["texture"] if prev else "这是我们最早的几次对话之一"
 
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            return
-
-        prompt = TEXTURE_ANALYSIS_PROMPT.format(
-            user_id=user_id,
-            conversation_summary=summary,
-            previous_texture=prev_text,
-        )
-
         try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
-                    },
-                    json={
-                        "model": current_model,
-                        "max_tokens": 300,
-                        "messages": [{"role": "user", "content": prompt}],
-                    },
-                    timeout=15.0,
-                )
-                resp.raise_for_status()
-                raw = resp.json()["content"][0]["text"].strip()
-                raw = raw.replace("```json","").replace("```","").strip()
-                result = json.loads(raw)
+            from core.model_registry import ModelRegistry as _MR
+            _reg = _MR()
+            _reg._current = current_model
+            raw = await _reg.complete(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=300,
+            )
+            if raw: raw = raw.strip()
         except Exception:
+            return None
+
             return
 
         now    = datetime.utcnow().isoformat()

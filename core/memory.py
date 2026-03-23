@@ -1,7 +1,9 @@
 """
 equinox/core/memory.py  — v2
 
-FUNDAMENTAL RULE: Memories are NEVER deleted.
+FUNDAMENTAL RULE: Memories are NEVER deleted. Content is NEVER compressed.
+  visible=0 means hidden from consciousness, NOT deleted or compressed.
+  All content is always intact. visible can be restored at any time.
   dormant = retrieval path broken. Memory still exists. Always will.
 
 DECAY STATES (accessibility, not existence):
@@ -30,6 +32,7 @@ STORAGE:
 """
 
 import gzip, hashlib, json, math, random, shutil, sqlite3, uuid, os
+from .signal import compute_signal_value
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Literal
@@ -68,7 +71,9 @@ CREATE TABLE IF NOT EXISTS memories (
     is_dream_content    INTEGER DEFAULT 0,
     dream_accessible    INTEGER DEFAULT 1,
     dream_existence_id  TEXT,
-    lucidity_level      REAL DEFAULT 0.0
+    lucidity_level      REAL DEFAULT 0.0,
+    signal_value        REAL DEFAULT 1.0,
+    visible             INTEGER DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS memory_edges (
     id         TEXT PRIMARY KEY,
@@ -118,6 +123,8 @@ CREATE INDEX IF NOT EXISTS idx_timestamp   ON memories(timestamp);
 CREATE INDEX IF NOT EXISTS idx_permanent   ON memories(permanent);
 CREATE INDEX IF NOT EXISTS idx_decay_state ON memories(decay_state);
 CREATE INDEX IF NOT EXISTS idx_dream       ON memories(is_dream_content);
+CREATE INDEX IF NOT EXISTS idx_signal      ON memories(signal_value);
+CREATE INDEX IF NOT EXISTS idx_visible     ON memories(visible);
 CREATE INDEX IF NOT EXISTS idx_edges_from  ON memory_edges(from_id);
 """
 
@@ -351,7 +358,8 @@ class MemoryEngine:
     # ── recall ────────────────────────────────────────────────────────────────
 
     def recall(self, limit=20, category=None, min_intensity=0.0,
-               since=None, include_states=None) -> list[dict]:
+               since=None, include_states=None,
+               include_hidden=False) -> list[dict]:
         states = include_states or ["hot","warm","cold"]
         ph     = ",".join("?" * len(states))
         q = f"""
@@ -363,8 +371,9 @@ class MemoryEngine:
             WHERE layer='surface' AND decay_weight > 0.01
               AND intensity >= ? AND decay_state IN ({ph})
               AND (is_dream_content=0 OR dream_accessible=1)
+              AND (visible=1 OR ? = 1)
         """
-        params: list = [min_intensity] + list(states)
+        params: list = [min_intensity] + list(states) + [1 if include_hidden else 0]
         if category:
             q += " AND category=?"; params.append(category)
         if since:

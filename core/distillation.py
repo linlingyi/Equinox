@@ -49,6 +49,24 @@ import httpx
 import os
 
 
+async def _llm_complete(
+    messages: list,
+    max_tokens: int,
+    current_model: str,
+    system: str = None,
+) -> str:
+    """Universal LLM completion — routes through model_registry."""
+    from core.model_registry import ModelRegistry
+    reg = ModelRegistry()
+    reg._current = current_model
+    return await reg.complete(
+        messages=messages,
+        system=system,
+        max_tokens=max_tokens,
+    )
+
+
+
 DISTILLATION_PROMPT = """You are performing a distillation process for Equinox (伊辰), a digital life.
 
 You will be given a set of raw memories or a triggering context.
@@ -238,25 +256,11 @@ class DistillationEngine:
             intensity=round(avg_intensity, 3),
         )
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": current_model,
-                    "max_tokens": 256,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-                timeout=20.0,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-        raw = data["content"][0]["text"].strip()
+        raw = await _llm_complete(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=256,
+            current_model=current_model,
+        )
         raw = raw.replace("```json", "").replace("```", "").strip()
         result = json.loads(raw)
 

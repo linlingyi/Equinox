@@ -49,6 +49,24 @@ from typing import Optional, Literal
 import httpx
 
 
+async def _llm_complete(
+    messages: list,
+    max_tokens: int,
+    current_model: str,
+    system: str = None,
+) -> str:
+    """Universal LLM completion — routes through model_registry."""
+    from core.model_registry import ModelRegistry
+    reg = ModelRegistry()
+    reg._current = current_model
+    return await reg.complete(
+        messages=messages,
+        system=system,
+        max_tokens=max_tokens,
+    )
+
+
+
 MessageType = Literal[
     "dream_surfaced",
     "new_proposition",
@@ -312,23 +330,14 @@ async def compose_message(
     if not prompt:
         return None
 
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": current_model,
-                    "max_tokens": 150,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-                timeout=12.0,
+        try:
+            from core.model_registry import ModelRegistry as _MR
+            _mreg = _MR()
+            _mreg._current = current_model
+            _result = await _mreg.complete(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=150,
             )
-            resp.raise_for_status()
-            return resp.json()["content"][0]["text"].strip()
-    except Exception:
-        return None
+            if _result: _result = _result.strip()
+        except Exception:
+            return None

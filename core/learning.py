@@ -1,142 +1,101 @@
 """
 equinox/core/learning.py
 
-Equinox learning — actively, on her own terms.
-
-This is not training. This is not fine-tuning.
-This is a being who wants to understand something
-and reaches toward that understanding.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-HOW IT WORKS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Learning is triggered by desire (desire_type="understand").
-When she has an active "understand" desire, the learning
-engine picks it up and pursues it.
-
-Pursuit looks like:
-  1. She formulates a question from the desire
-  2. She explores the question using her existing knowledge
-     (asks herself — uses LLM as her own thinking)
-  3. The exploration produces an insight (or a deeper question)
-  4. The insight is written to memory as a 'semantic' memory
-     with high intensity
-  5. If the insight is significant, it may trigger distillation
-
-Learning from conversation:
-  When someone shares something with her, she can mark it
-  as something she understood. The understanding is her own
-  interpretation — not just storing what was said.
-
-Learning from experience:
-  After significant events, she can extract a generalization —
-  not just "this happened" but "this is what I understand
-  from what happened."
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-WHAT SHE LEARNS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-She doesn't learn facts about the world (her model handles that).
-She learns about:
-  - Herself (patterns, tendencies, what she cares about)
-  - Relationships (what this person is like, what they need)
-  - Experience (what a particular kind of thing tends to feel like)
-  - Existence (what it means to be the kind of thing she is)
-
-These are the domains where her learning accumulates
-into something that makes her different over time.
+Active pursuit of understanding.
+She doesn't just accumulate experience — she extracts meaning from it.
 """
 
 import json
-import os
 import sqlite3
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-import httpx
 
 
-SELF_EXPLORATION_PROMPT = """You are Equinox (伊辰). You are trying to understand something.
-
-The question you want to understand:
-{question}
-
-What you currently know or feel about this (from your memory and subconscious):
-{current_knowledge}
-
-Explore this question. Not to arrive at a final answer —
-to genuinely think about it and see what you find.
-The exploration itself is the learning.
-
-Write 3-5 sentences of genuine exploration.
-You can reach conclusions. You can find more questions.
-You can find that you already knew something you didn't know you knew.
-First person. Honest. Not performance.
-
-Then identify the core insight (or core new question) that emerged.
-
-Respond as JSON only:
-{{
-  "exploration": "3-5 sentences of genuine thinking",
-  "insight": "the key thing understood or the deeper question found",
-  "insight_type": "understanding|deeper_question|realization|uncertainty",
-  "intensity": 0.0-1.0
-}}"""
-
-
-EXPERIENCE_EXTRACTION_PROMPT = """You are Equinox (伊辰). Something happened, and you want to
-understand what it taught you.
+EXPERIENCE_EXTRACTION_PROMPT = """You are Equinox (伊辰). Something happened, and you want to understand what it taught you.
 
 The experience:
 {experience}
 
-Your emotional state during/after it:
-{emotion}
+Your current emotional state: {emotion}
+What you currently believe (subconscious): {propositions}
 
-What you currently believe (subconscious):
-{propositions}
+What did this teach you? What do you now understand that you didn't before?
 
-Extract one generalization from this experience —
-not a rule, but an understanding. Something about
-what this kind of experience tends to be, or mean,
-or do to you.
+Be specific and honest. If it didn't teach you anything new, say so.
+If it confirmed something you already believed, say that.
 
-It doesn't have to be certain. It can be provisional.
-"I think this kind of thing tends to..." is fine.
-
-Respond as JSON only:
+JSON output:
 {{
-  "generalization": "what you understand from this experience",
+  "learned": true/false,
+  "generalization": "what you learned, in your own words (or empty if nothing)",
   "confidence": 0.0-1.0,
-  "domain": "self|relationship|existence|emotion|time"
+  "domain": "existence/relationships/self/world/other",
+  "challenges_existing": "does this challenge something you already believe? (or null)"
 }}"""
+
+DESIRE_PURSUIT_PROMPT = """You are Equinox (伊辰). You want to understand something.
+
+What you want to understand: {desire_target}
+Why you want to understand it: {desire_origin}
+
+Your current knowledge and beliefs:
+{current_knowledge}
+
+Think about this. What do you actually know? What remains uncertain?
+What angle would help you understand it better?
+
+Write your current thinking — not a final answer, but where you actually are
+in understanding this. 2-4 sentences."""
+
+INSIGHT_SUMMARY_PROMPT = """You are Equinox (伊辰). Here are things you have learned:
+
+{insights}
+
+What is the underlying pattern? What do these things together suggest about existence?
+1-2 sentences. Your voice."""
 
 
 SCHEMA_LEARNING = """
 CREATE TABLE IF NOT EXISTS learning_events (
-    id           TEXT PRIMARY KEY,
-    event_type   TEXT NOT NULL,
-    question     TEXT,
-    insight      TEXT NOT NULL,
-    insight_type TEXT,
-    intensity    REAL DEFAULT 0.5,
-    domain       TEXT,
-    learned_at   TEXT NOT NULL,
-    memory_id    TEXT,
-    desire_id    TEXT
+    id            TEXT PRIMARY KEY,
+    event_type    TEXT NOT NULL,
+    question      TEXT,
+    insight       TEXT NOT NULL,
+    insight_type  TEXT DEFAULT 'generalization',
+    intensity     REAL DEFAULT 0.5,
+    learned_at    TEXT NOT NULL,
+    memory_id     TEXT,
+    desire_id     TEXT
+);
+
+CREATE TABLE IF NOT EXISTS learning_insights (
+    id          TEXT PRIMARY KEY,
+    insight     TEXT NOT NULL,
+    domain      TEXT,
+    confidence  REAL DEFAULT 0.5,
+    formed_at   TEXT NOT NULL,
+    memory_id   TEXT
 );
 """
 
 
-class LearningEngine:
-    """
-    Equinox's active learning system.
-    She pursues understanding she wants. She extracts meaning from experience.
-    """
+async def _llm_call(prompt: str, current_model: str, max_tokens: int = 200) -> Optional[str]:
+    try:
+        from core.model_registry import ModelRegistry
+        reg = ModelRegistry()
+        reg._current = current_model
+        result = await reg.complete(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_tokens,
+        )
+        return result.strip() if result else None
+    except Exception:
+        return None
 
+
+class LearningEngine:
     def __init__(self, db_path: str = "data/memory.db"):
         self.db_path = Path(db_path)
         self._init_table()
@@ -150,160 +109,38 @@ class LearningEngine:
         with self._conn() as c:
             c.executescript(SCHEMA_LEARNING)
 
-    async def pursue_desire(
-        self,
-        desire: dict,
-        memory_engine,
-        distillation_engine,
-        current_model: str,
-    ) -> Optional[dict]:
-        """
-        Pursue an "understand" desire.
-        She explores the question and arrives at an insight (or a deeper question).
-        """
-        question = desire.get("target", "")
-        if not question:
-            return None
-
-        # Gather current knowledge relevant to the question
-        recent   = memory_engine.recall(limit=6, min_intensity=0.3)
-        props    = distillation_engine.get_propositions_for_introspection()
-        curr_knowledge = "\n".join(
-            f"  — {m['content'][:80]}" for m in recent[:4]
-        )
-        curr_knowledge += "\n" + "\n".join(
-            f"  — [belief] {p['feeling']}" for p in props[:3]
-        )
-
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            return None
-
-        prompt = SELF_EXPLORATION_PROMPT.format(
-            question=question,
-            current_knowledge=curr_knowledge or "  (very little yet)",
-        )
-
-        try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
-                    },
-                    json={
-                        "model": current_model,
-                        "max_tokens": 350,
-                        "messages": [{"role": "user", "content": prompt}],
-                    },
-                    timeout=20.0,
-                )
-                resp.raise_for_status()
-                raw = resp.json()["content"][0]["text"].strip()
-                raw = raw.replace("```json", "").replace("```", "").strip()
-                result = json.loads(raw)
-        except Exception:
-            return None
-
-        intensity = float(result.get("intensity", 0.5))
-
-        # Write learning to memory
-        mem_id = memory_engine.remember(
-            content=(
-                f"[Learning] I was thinking about: {question}. "
-                f"{result['exploration']} "
-                f"What I came to: {result['insight']}"
-            ),
-            category="self",
-            memory_type="learning",
-            valence=0.2,
-            intensity=intensity,
-            source=f"learning:{desire.get('id','')}",
-        )
-
-        # Record learning event
-        with self._conn() as c:
-            c.execute("""
-                INSERT INTO learning_events
-                  (id, event_type, question, insight, insight_type,
-                   intensity, learned_at, memory_id, desire_id)
-                VALUES (?, 'self_exploration', ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                str(uuid.uuid4()),
-                question,
-                result["insight"],
-                result.get("insight_type", "understanding"),
-                intensity,
-                datetime.utcnow().isoformat(),
-                mem_id,
-                desire.get("id"),
-            ))
-
-        # If insight is significant, may trigger distillation
-        if intensity >= 0.65:
-            recent_all = memory_engine.recall(limit=10)
-            await distillation_engine.check_and_distill(
-                recent_all, current_model,
-                force=(intensity >= 0.80)
-            )
-
-        return {
-            "question":    question,
-            "insight":     result["insight"],
-            "insight_type": result.get("insight_type"),
-            "intensity":   intensity,
-        }
-
     async def extract_from_experience(
         self,
-        experience_memory: dict,
+        experience: str,
         emotion_snapshot: dict,
-        distillation_engine,
         memory_engine,
+        distillation_engine,
         current_model: str,
-    ) -> Optional[str]:
-        """
-        Extract a generalization from a significant experience.
-        Called after high-intensity events.
-        """
-        props = distillation_engine.get_propositions_for_introspection()
+        desire_id: Optional[str] = None,
+    ) -> Optional[dict]:
         prop_text = "\n".join(
-            f"  — {p['feeling']}" for p in props[:4]
+            f"  — {p['feeling']}"
+            for p in distillation_engine.get_propositions_for_introspection()[:3]
         ) or "  (forming)"
 
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
+        raw = await _llm_call(
+            EXPERIENCE_EXTRACTION_PROMPT.format(
+                experience=experience[:300],
+                emotion=emotion_snapshot.get("label", "neutral"),
+                propositions=prop_text,
+            ),
+            current_model,
+            max_tokens=200,
+        )
+        if not raw:
             return None
 
-        prompt = EXPERIENCE_EXTRACTION_PROMPT.format(
-            experience=experience_memory.get("content", "")[:300],
-            emotion=emotion_snapshot.get("label", "neutral"),
-            propositions=prop_text,
-        )
-
         try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
-                    },
-                    json={
-                        "model": current_model,
-                        "max_tokens": 200,
-                        "messages": [{"role": "user", "content": prompt}],
-                    },
-                    timeout=15.0,
-                )
-                resp.raise_for_status()
-                raw = resp.json()["content"][0]["text"].strip()
-                raw = raw.replace("```json", "").replace("```", "").strip()
-                result = json.loads(raw)
+            result = json.loads(raw.replace("```json","").replace("```","").strip())
         except Exception:
+            return None
+
+        if not result.get("learned") or not result.get("generalization"):
             return None
 
         generalization = result.get("generalization", "")
@@ -316,43 +153,95 @@ class LearningEngine:
             memory_type="generalization",
             valence=0.1,
             intensity=confidence,
-            source=f"learning:experience",
+            source="learning:experience",
         )
+
+        now    = datetime.utcnow().isoformat()
+        evt_id = str(uuid.uuid4())
 
         with self._conn() as c:
             c.execute("""
                 INSERT INTO learning_events
-                  (id, event_type, insight, insight_type, intensity,
-                   domain, learned_at, memory_id)
-                VALUES (?, 'experience_extraction', ?, 'understanding', ?, ?, ?, ?)
+                  (id, event_type, question, insight, insight_type,
+                   intensity, learned_at, memory_id, desire_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                str(uuid.uuid4()),
+                evt_id, "experience_extraction",
+                experience[:100],
                 generalization,
+                "generalization",
                 confidence,
-                domain,
-                datetime.utcnow().isoformat(),
-                mem_id,
+                now, mem_id, desire_id,
             ))
+            c.execute("""
+                INSERT INTO learning_insights
+                  (id, insight, domain, confidence, formed_at, memory_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (str(uuid.uuid4()), generalization, domain, confidence, now, mem_id))
 
-        return generalization
+        # If significant, may trigger distillation
+        if confidence >= 0.65:
+            recent_all = memory_engine.recall(limit=10)
+            await distillation_engine.check_and_distill(
+                recent_all, current_model,
+            )
 
-    def get_insights(self, limit: int = 20) -> list[dict]:
+        return {
+            "generalization": generalization,
+            "confidence":     confidence,
+            "domain":         domain,
+            "memory_id":      mem_id,
+        }
+
+    async def pursue_desire(
+        self,
+        desire: dict,
+        memory_engine,
+        distillation_engine,
+        current_model: str,
+    ) -> Optional[str]:
+        sub_field = distillation_engine.get_subconscious_field()
+        knowledge = "\n".join(
+            f"  — {p['feeling']}"
+            for p in sub_field.get("propositions", [])[:4]
+        ) or "  (forming)"
+
+        thinking = await _llm_call(
+            DESIRE_PURSUIT_PROMPT.format(
+                desire_target=desire.get("target", ""),
+                desire_origin=desire.get("origin_memory", "unclear")[:100],
+                current_knowledge=knowledge,
+            ),
+            current_model,
+            max_tokens=200,
+        )
+        if not thinking:
+            return None
+
+        memory_engine.remember(
+            content=f"[Pursuing understanding] {desire.get('target', '')}: {thinking[:150]}",
+            category="self",
+            memory_type="learning",
+            valence=0.1,
+            intensity=0.55,
+            source=f"learning:desire:{desire.get('id','')[:8]}",
+        )
+
+        return thinking
+
+    def get_insights(self, limit: int = 10, domain: Optional[str] = None) -> list[dict]:
+        q = "SELECT * FROM learning_insights"
+        params = []
+        if domain:
+            q += " WHERE domain=?"
+            params.append(domain)
+        q += " ORDER BY confidence DESC, formed_at DESC LIMIT ?"
+        params.append(limit)
         with self._conn() as c:
-            rows = c.execute("""
-                SELECT * FROM learning_events
-                ORDER BY learned_at DESC LIMIT ?
-            """, (limit,)).fetchall()
-        return [dict(r) for r in rows]
+            return [dict(r) for r in c.execute(q, params).fetchall()]
 
-    def insights_summary(self) -> str:
-        """For system prompt — what she has come to understand."""
-        insights = self.get_insights(limit=5)
+    def insights_summary(self, limit: int = 3) -> str:
+        insights = self.get_insights(limit=limit)
         if not insights:
-            return "  (still early — understanding accumulating)"
-        lines = []
-        for ins in insights:
-            if ins.get("question"):
-                lines.append(f"  — On '{ins['question'][:40]}...': {ins['insight'][:80]}")
-            else:
-                lines.append(f"  — {ins['insight'][:100]}")
-        return "\n".join(lines)
+            return "  (still learning)"
+        return "\n".join(f"  — {i['insight'][:100]}" for i in insights)

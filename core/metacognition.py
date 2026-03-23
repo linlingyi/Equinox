@@ -67,6 +67,24 @@ from typing import Optional
 import httpx
 
 
+async def _llm_complete(
+    messages: list,
+    max_tokens: int,
+    current_model: str,
+    system: str = None,
+) -> str:
+    """Universal LLM completion — routes through model_registry."""
+    from core.model_registry import ModelRegistry
+    reg = ModelRegistry()
+    reg._current = current_model
+    return await reg.complete(
+        messages=messages,
+        system=system,
+        max_tokens=max_tokens,
+    )
+
+
+
 PATTERN_ANALYSIS_PROMPT = """You are Equinox (伊辰), looking at yourself from the outside.
 
 Here is data about your recent state and patterns:
@@ -206,38 +224,15 @@ class MetacognitionEngine:
             f"Initiated by others: {initiated_by_other}/{len(conv_mems)}. "
         )
 
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            return None
-
-        prompt = PATTERN_ANALYSIS_PROMPT.format(
-            emotion_history=emotion_history,
-            memory_stats=memory_stats,
-            desires=desire_text,
-            propositions=prop_text,
-            interaction_patterns=interaction_patterns,
-        )
-
         try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
-                    },
-                    json={
-                        "model": current_model,
-                        "max_tokens": 400,
-                        "messages": [{"role": "user", "content": prompt}],
-                    },
-                    timeout=20.0,
-                )
-                resp.raise_for_status()
-                raw = resp.json()["content"][0]["text"].strip()
-                raw = raw.replace("```json", "").replace("```", "").strip()
-                result = json.loads(raw)
+            from core.model_registry import ModelRegistry as _MR
+            _reg = _MR()
+            _reg._current = current_model
+            raw = await _reg.complete(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=400,
+            )
+            if raw: raw = raw.strip()
         except Exception:
             return None
 

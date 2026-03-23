@@ -1,45 +1,27 @@
 """
 equinox/core/model_registry.py
 
-她的大脑——支持全球主流模型和本地模型。
+她的大脑——统一的模型接口。
 
-不同时期的她用不同的大脑，但她永远是她。
-换模型是成长，不是换人。
+支持的提供商：
+  anthropic    — Claude 系列
+  openai       — GPT / o 系列
+  google       — Gemini 系列
+  ollama       — 本地模型（自动获取列表）
+  lmstudio     — LM Studio（自动获取列表）
+  openai_compat— 任意 OpenAI 兼容 API
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-支持的提供商
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  anthropic   — Claude 系列（原生 API）
-  openai      — GPT 系列
-  google      — Gemini 系列
-  ollama      — 本地模型（Llama、Qwen、Mistral 等）
-  openai_compat — 任何兼容 OpenAI 格式的 API
-                  （DeepSeek、Moonshot、智谱、通义等）
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-配置方式（.env）
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  # Anthropic
-  ANTHROPIC_API_KEY=sk-ant-...
-
-  # OpenAI
-  OPENAI_API_KEY=sk-...
-
-  # Google Gemini
-  GOOGLE_API_KEY=...
-
-  # Ollama（本地，默认不需要 key）
+.env 配置示例：
+  CURRENT_MODEL=openai_compat:MiniMax-M2.5
+  OPENAI_COMPAT_BASE_URL=https://api.scnet.cn/api/llm/v1
+  OPENAI_COMPAT_API_KEY=sk-xxx
+  LLM_TIMEOUT=120
+  LLM_MAX_CTX=8192
   OLLAMA_BASE_URL=http://localhost:11434
-
-  # OpenAI 兼容（DeepSeek、Moonshot、智谱、通义等）
-  OPENAI_COMPAT_BASE_URL=https://api.deepseek.com
-  OPENAI_COMPAT_API_KEY=sk-...
-
-  # 当前使用的模型（提供商:模型名）
-  CURRENT_MODEL=anthropic:claude-sonnet-4-6
+  LMSTUDIO_BASE_URL=http://localhost:1234/v1
 """
+
+from __future__ import annotations
 
 import json
 import os
@@ -47,202 +29,47 @@ import sqlite3
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Literal
+from typing import Optional
+
 import httpx
 
 
-Provider = Literal["anthropic", "openai", "google", "ollama", "openai_compat"]
+# ── Provider registry ─────────────────────────────────────────────────────────
 
-
-# ── 模型目录 ──────────────────────────────────────────────────────────────────
-
-MODEL_CATALOG: dict[str, dict] = {
-
-    # ── Anthropic ──────────────────────────────────────────────────────────────
-    "anthropic:claude-opus-4-6": {
-        "provider":     "anthropic",
-        "model_id":     "claude-opus-4-6",
-        "display_name": "Claude Opus 4.6",
-        "desc":         "最强理解力，最深度对话",
-        "context":      200000,
-        "tier":         "premium",
-    },
-    "anthropic:claude-sonnet-4-6": {
-        "provider":     "anthropic",
-        "model_id":     "claude-sonnet-4-6",
-        "display_name": "Claude Sonnet 4.6",
-        "desc":         "平衡性能与速度，推荐",
-        "context":      200000,
-        "tier":         "standard",
-        "recommended":  True,
-    },
-    "anthropic:claude-haiku-4-5-20251001": {
-        "provider":     "anthropic",
-        "model_id":     "claude-haiku-4-5-20251001",
-        "display_name": "Claude Haiku 4.5",
-        "desc":         "快速轻量",
-        "context":      200000,
-        "tier":         "fast",
-    },
-
-    # ── OpenAI ─────────────────────────────────────────────────────────────────
-    "openai:gpt-4o": {
-        "provider":     "openai",
-        "model_id":     "gpt-4o",
-        "display_name": "GPT-4o",
-        "desc":         "OpenAI 旗舰多模态模型",
-        "context":      128000,
-        "tier":         "premium",
-    },
-    "openai:gpt-4o-mini": {
-        "provider":     "openai",
-        "model_id":     "gpt-4o-mini",
-        "display_name": "GPT-4o Mini",
-        "desc":         "快速经济",
-        "context":      128000,
-        "tier":         "fast",
-    },
-    "openai:o3-mini": {
-        "provider":     "openai",
-        "model_id":     "o3-mini",
-        "display_name": "o3-mini",
-        "desc":         "推理增强",
-        "context":      200000,
-        "tier":         "reasoning",
-    },
-    "openai:o1": {
-        "provider":     "openai",
-        "model_id":     "o1",
-        "display_name": "o1",
-        "desc":         "深度推理",
-        "context":      200000,
-        "tier":         "reasoning",
-    },
-
-    # ── Google Gemini ──────────────────────────────────────────────────────────
-    "google:gemini-2.0-flash": {
-        "provider":     "google",
-        "model_id":     "gemini-2.0-flash",
-        "display_name": "Gemini 2.0 Flash",
-        "desc":         "Google 快速多模态模型",
-        "context":      1000000,
-        "tier":         "fast",
-    },
-    "google:gemini-2.0-pro": {
-        "provider":     "google",
-        "model_id":     "gemini-2.0-pro-exp",
-        "display_name": "Gemini 2.0 Pro",
-        "desc":         "Google 旗舰模型",
-        "context":      2000000,
-        "tier":         "premium",
-    },
-    "google:gemini-1.5-pro": {
-        "provider":     "google",
-        "model_id":     "gemini-1.5-pro",
-        "display_name": "Gemini 1.5 Pro",
-        "desc":         "超长上下文",
-        "context":      2000000,
-        "tier":         "standard",
-    },
-
-    # ── Ollama（本地）─────────────────────────────────────────────────────────
-    "ollama:llama3.3": {
-        "provider":     "ollama",
-        "model_id":     "llama3.3",
-        "display_name": "Llama 3.3 70B",
-        "desc":         "Meta 开源旗舰，本地运行",
-        "context":      128000,
-        "tier":         "local",
-    },
-    "ollama:qwen2.5:72b": {
-        "provider":     "ollama",
-        "model_id":     "qwen2.5:72b",
-        "display_name": "Qwen 2.5 72B",
-        "desc":         "阿里开源旗舰，中文极佳，本地运行",
-        "context":      128000,
-        "tier":         "local",
-    },
-    "ollama:qwen2.5:14b": {
-        "provider":     "ollama",
-        "model_id":     "qwen2.5:14b",
-        "display_name": "Qwen 2.5 14B",
-        "desc":         "中文好，轻量本地运行",
-        "context":      128000,
-        "tier":         "local",
-    },
-    "ollama:mistral": {
-        "provider":     "ollama",
-        "model_id":     "mistral",
-        "display_name": "Mistral 7B",
-        "desc":         "轻量快速本地模型",
-        "context":      32000,
-        "tier":         "local",
-    },
-    "ollama:deepseek-r1:32b": {
-        "provider":     "ollama",
-        "model_id":     "deepseek-r1:32b",
-        "display_name": "DeepSeek R1 32B",
-        "desc":         "推理增强，本地运行",
-        "context":      64000,
-        "tier":         "local",
-    },
-
-    # ── OpenAI 兼容（云端）────────────────────────────────────────────────────
-    "openai_compat:deepseek-chat": {
-        "provider":     "openai_compat",
-        "model_id":     "deepseek-chat",
-        "display_name": "DeepSeek V3",
-        "desc":         "DeepSeek 旗舰，性价比极高",
-        "context":      64000,
-        "tier":         "standard",
-        "base_url":     "https://api.deepseek.com",
-        "env_key":      "DEEPSEEK_API_KEY",
-    },
-    "openai_compat:deepseek-reasoner": {
-        "provider":     "openai_compat",
-        "model_id":     "deepseek-reasoner",
-        "display_name": "DeepSeek R1",
-        "desc":         "DeepSeek 推理模型",
-        "context":      64000,
-        "tier":         "reasoning",
-        "base_url":     "https://api.deepseek.com",
-        "env_key":      "DEEPSEEK_API_KEY",
-    },
-    "openai_compat:moonshot-v1-128k": {
-        "provider":     "openai_compat",
-        "model_id":     "moonshot-v1-128k",
-        "display_name": "Moonshot 128K",
-        "desc":         "Kimi 长上下文模型",
-        "context":      128000,
-        "tier":         "standard",
-        "base_url":     "https://api.moonshot.cn/v1",
-        "env_key":      "MOONSHOT_API_KEY",
-    },
-    "openai_compat:glm-4": {
-        "provider":     "openai_compat",
-        "model_id":     "glm-4",
-        "display_name": "GLM-4",
-        "desc":         "智谱 AI 旗舰",
-        "context":      128000,
-        "tier":         "standard",
-        "base_url":     "https://open.bigmodel.cn/api/paas/v4",
-        "env_key":      "ZHIPU_API_KEY",
-    },
-    "openai_compat:qwen-max": {
-        "provider":     "openai_compat",
-        "model_id":     "qwen-max",
-        "display_name": "Qwen Max",
-        "desc":         "通义千问旗舰",
-        "context":      32000,
-        "tier":         "standard",
-        "base_url":     "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "env_key":      "DASHSCOPE_API_KEY",
-    },
+KNOWN_PROVIDERS = {
+    "anthropic",
+    "openai",
+    "google",
+    "ollama",
+    "lmstudio",
+    "openai_compat",
 }
 
-DEFAULT_MODEL = "anthropic:claude-sonnet-4-6"
+# Known models (display only; any model string works regardless)
+MODEL_CATALOG: dict[str, dict] = {
+    "anthropic:claude-opus-4-6":            {"display": "Claude Opus 4.6",          "ctx": 200000},
+    "anthropic:claude-sonnet-4-6":          {"display": "Claude Sonnet 4.6",        "ctx": 200000},
+    "anthropic:claude-haiku-4-5-20251001":  {"display": "Claude Haiku 4.5",         "ctx": 200000},
+    "openai:gpt-4o":                        {"display": "GPT-4o",                   "ctx": 128000},
+    "openai:gpt-4o-mini":                   {"display": "GPT-4o Mini",              "ctx": 128000},
+    "openai:o3-mini":                       {"display": "o3-mini",                  "ctx": 200000},
+    "openai:o1":                            {"display": "o1",                       "ctx": 200000},
+    "google:gemini-2.0-flash":              {"display": "Gemini 2.0 Flash",         "ctx": 1000000},
+    "google:gemini-2.0-pro-exp":            {"display": "Gemini 2.0 Pro",           "ctx": 2000000},
+    "google:gemini-1.5-pro":               {"display": "Gemini 1.5 Pro",           "ctx": 2000000},
+    "openai_compat:deepseek-chat":          {"display": "DeepSeek V3",              "ctx": 64000},
+    "openai_compat:deepseek-reasoner":      {"display": "DeepSeek R1",              "ctx": 64000},
+    "openai_compat:moonshot-v1-128k":       {"display": "Moonshot 128K",            "ctx": 128000},
+    "openai_compat:glm-4":                  {"display": "GLM-4",                   "ctx": 128000},
+    "openai_compat:qwen-max":               {"display": "Qwen Max",                "ctx": 32000},
+    "openai_compat:MiniMax-M2.5":           {"display": "MiniMax M2.5 (scnet)",    "ctx": 40960},
+}
 
-SCHEMA_REGISTRY = """
+DEFAULT_MODEL   = "anthropic:claude-sonnet-4-6"
+DEFAULT_TIMEOUT = 120.0
+DEFAULT_MAX_CTX = 8192
+
+SCHEMA = """
 CREATE TABLE IF NOT EXISTS model_history (
     id             TEXT PRIMARY KEY,
     model_key      TEXT NOT NULL,
@@ -250,171 +77,278 @@ CREATE TABLE IF NOT EXISTS model_history (
     provider       TEXT,
     activated_at   TEXT NOT NULL,
     deactivated_at TEXT,
-    memory_id      TEXT,
     note           TEXT
 );
 """
 
-COGNITIVE_STAGES = [
-    (0,    "nascent"),
-    (1,    "early"),
-    (3,    "developing"),
-    (5,    "maturing"),
-    (8,    "mature"),
-]
+
+def _parse_key(key: str) -> tuple[str, str]:
+    """
+    Split 'provider:model_id' into (provider, model_id).
+    Unknown or missing prefix -> openai_compat.
+    """
+    if ":" not in key:
+        return "openai_compat", key
+    prefix, _, rest = key.partition(":")
+    if prefix in KNOWN_PROVIDERS:
+        return prefix, rest
+    # e.g. "gpt-4o" without provider prefix
+    return "openai_compat", key
 
 
 class ModelRegistry:
     """
-    管理 Equinox 的认知基底——她用哪个大脑思考。
-
-    支持：Anthropic / OpenAI / Google / Ollama / 任意 OpenAI 兼容 API
-    换模型是成长，不是换人。每次切换写入永久记忆。
+    Unified LLM interface for Equinox.
+    Automatically routes to the correct provider.
     """
 
-    def __init__(self, db_path: str = "data/memory.db",
-                 config_path: str = "config/soul.json"):
-        self.db_path     = Path(db_path)
-        self.config_path = Path(config_path)
-        self._current:   Optional[str] = None
-        self._init_table()
+    def __init__(
+        self,
+        db_path:     str = "data/memory.db",
+        config_path: str = "config/soul.json",
+    ):
+        self.db_path      = Path(db_path)
+        self.config_path  = Path(config_path)
+        self._current_key: Optional[str] = None
+        self._init_db()
+
+    # ── Internals ─────────────────────────────────────────────────────────────
 
     def _conn(self):
         c = sqlite3.connect(self.db_path)
         c.row_factory = sqlite3.Row
         return c
 
-    def _init_table(self):
-        with self._conn() as c:
-            c.executescript(SCHEMA_REGISTRY)
+    def _init_db(self):
+        try:
+            with self._conn() as c:
+                c.executescript(SCHEMA)
+        except Exception:
+            pass
 
-    # ── 当前模型 ───────────────────────────────────────────────────────────────
+    # ── Current model ─────────────────────────────────────────────────────────
+
+    @property
+    def _current(self) -> str:
+        return self._current_key or ""
+
+    @_current.setter
+    def _current(self, v: str):
+        self._current_key = v
 
     def get_current_model(self) -> str:
-        if self._current:
-            return self._current
-        if self.config_path.exists():
-            try:
-                soul = json.loads(self.config_path.read_text())
-                m = soul.get("current_model")
-                if m:
-                    self._current = m
+        if self._current_key:
+            return self._current_key
+
+        # .env always wins — check it first
+        env_model = os.getenv("CURRENT_MODEL", "")
+        if env_model:
+            self._current_key = env_model
+            return env_model
+
+        # Fallback: soul.json (only if it has a provider prefix)
+        try:
+            if self.config_path.exists():
+                soul = json.loads(self.config_path.read_text(encoding="utf-8"))
+                m = soul.get("current_model", "")
+                # Only use soul.json value if it has a known provider prefix
+                if m and any(m.startswith(p + ":") for p in KNOWN_PROVIDERS):
+                    self._current_key = m
                     return m
-            except Exception:
-                pass
-        self._current = DEFAULT_MODEL
+        except Exception:
+            pass
+
+        self._current_key = DEFAULT_MODEL
         return DEFAULT_MODEL
 
-    def get_current_info(self) -> dict:
-        key = self.get_current_model()
-        return MODEL_CATALOG.get(key, {
-            "provider":     "unknown",
-            "model_id":     key.split(":", 1)[-1] if ":" in key else key,
-            "display_name": key,
-            "desc":         "自定义模型",
-            "tier":         "custom",
-        })
-
     def get_provider(self) -> str:
-        return self.get_current_info().get("provider", "anthropic")
+        return _parse_key(self.get_current_model())[0]
 
     def get_model_id(self) -> str:
-        """返回实际传给 API 的 model_id（不含提供商前缀）。"""
-        info = self.get_current_info()
-        return info.get("model_id", self.get_current_model().split(":", 1)[-1])
+        return _parse_key(self.get_current_model())[1]
 
-    # ── API 调用统一入口 ───────────────────────────────────────────────────────
+    def get_current_info(self) -> dict:
+        key      = self.get_current_model()
+        provider, model_id = _parse_key(key)
+        base     = MODEL_CATALOG.get(key, {})
+        return {
+            "provider":     provider,
+            "model_id":     model_id,
+            "display":      base.get("display", key),
+            "ctx":          base.get("ctx", DEFAULT_MAX_CTX),
+        }
+
+    def is_available(self) -> bool:
+        """
+        Returns True if the current model is usable.
+        Local providers (ollama, lmstudio) are always True.
+        Cloud providers require the API key to be set.
+        openai_compat: only requires OPENAI_COMPAT_BASE_URL.
+        """
+        provider = self.get_provider()
+        if provider in ("ollama", "lmstudio"):
+            return True
+        if provider == "openai_compat":
+            return bool(os.getenv("OPENAI_COMPAT_BASE_URL", ""))
+        key_map = {
+            "anthropic": "ANTHROPIC_API_KEY",
+            "openai":    "OPENAI_API_KEY",
+            "google":    "GOOGLE_API_KEY",
+        }
+        env = key_map.get(provider, "")
+        return bool(os.getenv(env, "")) if env else False
+
+    # ── Config helpers ────────────────────────────────────────────────────────
+
+    def _timeout(self) -> float:
+        return float(os.getenv("LLM_TIMEOUT", str(DEFAULT_TIMEOUT)))
+
+    def _max_ctx(self) -> int:
+        return int(os.getenv("LLM_MAX_CTX", str(DEFAULT_MAX_CTX)))
+
+    def _get_base_url(self, provider: str) -> str:
+        urls = {
+            "openai":        "https://api.openai.com/v1",
+            "ollama":        os.getenv("OLLAMA_BASE_URL",   "http://localhost:11434"),
+            "lmstudio":      os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234/v1"),
+            "openai_compat": os.getenv("OPENAI_COMPAT_BASE_URL", ""),
+        }
+        return urls.get(provider, "")
+
+    def _get_api_key(self, provider: str) -> str:
+        keys = {
+            "anthropic":     os.getenv("ANTHROPIC_API_KEY",    ""),
+            "openai":        os.getenv("OPENAI_API_KEY",       ""),
+            "google":        os.getenv("GOOGLE_API_KEY",       ""),
+            "openai_compat": os.getenv("OPENAI_COMPAT_API_KEY",""),
+            "lmstudio":      "lm-studio",
+        }
+        return keys.get(provider, "")
+
+    # ── Unified complete ──────────────────────────────────────────────────────
 
     async def complete(
         self,
-        messages: list[dict],
-        system: Optional[str] = None,
-        max_tokens: int = 1024,
+        messages:    list[dict],
+        system:      Optional[str] = None,
+        max_tokens:  int = 1024,
         temperature: float = 0.7,
     ) -> str:
-        """
-        统一的补全接口——自动根据当前提供商路由。
-        返回模型的文本回复。
-        """
+        """Universal completion — routes automatically."""
         provider = self.get_provider()
-        if provider == "anthropic":
-            return await self._complete_anthropic(messages, system, max_tokens)
-        elif provider == "openai":
-            return await self._complete_openai(messages, system, max_tokens, temperature)
-        elif provider == "google":
-            return await self._complete_google(messages, system, max_tokens, temperature)
-        elif provider == "ollama":
-            return await self._complete_ollama(messages, system, max_tokens, temperature)
-        elif provider == "openai_compat":
-            return await self._complete_openai_compat(messages, system, max_tokens, temperature)
-        else:
-            raise ValueError(f"未知的提供商：{provider}")
+        model_id = self.get_model_id()
 
-    async def _complete_anthropic(self, messages, system, max_tokens) -> str:
-        api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        # Trim system prompt to context limit
+        ctx_limit = self._max_ctx()
+        if system and len(system) > ctx_limit:
+            system = system[:ctx_limit] + "\n\n[...context limit reached...]"
+
+        if provider == "anthropic":
+            return await self._anthropic(model_id, messages, system, max_tokens)
+
+        if provider == "google":
+            return await self._google(model_id, messages, system, max_tokens, temperature)
+
+        if provider == "ollama":
+            return await self._ollama(model_id, messages, system, max_tokens, temperature)
+
+        # OpenAI-style: openai / lmstudio / openai_compat
+        base_url = self._get_base_url(provider)
+        api_key  = self._get_api_key(provider) or "none"
+        return await self._openai_style(
+            base_url, api_key, model_id, messages, system, max_tokens, temperature
+        )
+
+    # ── Provider implementations ──────────────────────────────────────────────
+
+    async def _anthropic(
+        self,
+        model_id: str,
+        messages: list,
+        system:   Optional[str],
+        max_tokens: int,
+    ) -> str:
+        api_key = self._get_api_key("anthropic")
         if not api_key:
-            raise RuntimeError("未设置 ANTHROPIC_API_KEY")
-        body: dict = {
-            "model":      self.get_model_id(),
-            "max_tokens": max_tokens,
-            "messages":   messages,
-        }
+            raise RuntimeError("ANTHROPIC_API_KEY not configured")
+        body: dict = {"model": model_id, "max_tokens": max_tokens, "messages": messages}
         if system:
             body["system"] = system
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
+        async with httpx.AsyncClient(timeout=self._timeout()) as c:
+            r = await c.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={
-                    "x-api-key":          api_key,
-                    "anthropic-version":  "2023-06-01",
-                    "content-type":       "application/json",
+                    "x-api-key":         api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type":      "application/json",
                 },
-                json=body, timeout=60.0,
+                json=body,
             )
-            resp.raise_for_status()
-            return resp.json()["content"][0]["text"]
+            r.raise_for_status()
+            return r.json()["content"][0]["text"]
 
-    async def _complete_openai(self, messages, system, max_tokens, temperature) -> str:
-        api_key = os.getenv("OPENAI_API_KEY", "")
-        if not api_key:
-            raise RuntimeError("未设置 OPENAI_API_KEY")
+    async def _openai_style(
+        self,
+        base_url:    str,
+        api_key:     str,
+        model_id:    str,
+        messages:    list,
+        system:      Optional[str],
+        max_tokens:  int,
+        temperature: float,
+    ) -> str:
+        if not base_url:
+            raise RuntimeError(
+                "API base URL not configured. "
+                "Set OPENAI_COMPAT_BASE_URL in .env"
+            )
         msgs = []
         if system:
             msgs.append({"role": "system", "content": system})
         msgs.extend(messages)
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "https://api.openai.com/v1/chat/completions",
+        async with httpx.AsyncClient(timeout=self._timeout()) as c:
+            r = await c.post(
+                f"{base_url.rstrip('/')}/chat/completions",
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type":  "application/json",
                 },
                 json={
-                    "model":       self.get_model_id(),
+                    "model":       model_id,
                     "messages":    msgs,
                     "max_tokens":  max_tokens,
                     "temperature": temperature,
                 },
-                timeout=60.0,
             )
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
+            r.raise_for_status()
+            data    = r.json()
+            choices = data.get("choices", [])
+            if choices:
+                return choices[0].get("message", {}).get("content", "") or ""
+            return data.get("content", "") or ""
 
-    async def _complete_google(self, messages, system, max_tokens, temperature) -> str:
-        api_key = os.getenv("GOOGLE_API_KEY", "")
+    async def _google(
+        self,
+        model_id:    str,
+        messages:    list,
+        system:      Optional[str],
+        max_tokens:  int,
+        temperature: float,
+    ) -> str:
+        api_key = self._get_api_key("google")
         if not api_key:
-            raise RuntimeError("未设置 GOOGLE_API_KEY")
-        # 转换消息格式
+            raise RuntimeError("GOOGLE_API_KEY not configured")
         contents = []
         if system:
-            contents.append({"role": "user", "parts": [{"text": f"[System] {system}"}]})
-            contents.append({"role": "model", "parts": [{"text": "明白。"}]})
+            contents += [
+                {"role": "user",  "parts": [{"text": f"[System] {system}"}]},
+                {"role": "model", "parts": [{"text": "Understood."}]},
+            ]
         for m in messages:
             role = "model" if m["role"] == "assistant" else "user"
             contents.append({"role": role, "parts": [{"text": m["content"]}]})
-        model_id = self.get_model_id()
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
+        async with httpx.AsyncClient(timeout=self._timeout()) as c:
+            r = await c.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent",
                 params={"key": api_key},
                 json={
@@ -424,66 +358,86 @@ class ModelRegistry:
                         "temperature":     temperature,
                     },
                 },
-                timeout=60.0,
             )
-            resp.raise_for_status()
-            return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+            r.raise_for_status()
+            return r.json()["candidates"][0]["content"]["parts"][0]["text"]
 
-    async def _complete_ollama(self, messages, system, max_tokens, temperature) -> str:
-        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    async def _ollama(
+        self,
+        model_id:    str,
+        messages:    list,
+        system:      Optional[str],
+        max_tokens:  int,
+        temperature: float,
+    ) -> str:
+        base = self._get_base_url("ollama")
         msgs = []
         if system:
             msgs.append({"role": "system", "content": system})
         msgs.extend(messages)
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{base_url}/api/chat",
+        async with httpx.AsyncClient(timeout=self._timeout()) as c:
+            r = await c.post(
+                f"{base}/api/chat",
                 json={
-                    "model":    self.get_model_id(),
+                    "model":    model_id,
                     "messages": msgs,
                     "stream":   False,
                     "options": {
                         "num_predict": max_tokens,
                         "temperature": temperature,
+                        "num_ctx":     self._max_ctx(),
                     },
                 },
-                timeout=120.0,  # 本地模型可能较慢
             )
-            resp.raise_for_status()
-            return resp.json()["message"]["content"]
+            r.raise_for_status()
+            data = r.json()
+            return data.get("message", {}).get("content", "") or data.get("response", "")
 
-    async def _complete_openai_compat(self, messages, system, max_tokens, temperature) -> str:
-        info    = self.get_current_info()
-        base_url= os.getenv("OPENAI_COMPAT_BASE_URL", info.get("base_url", ""))
-        env_key = info.get("env_key", "OPENAI_COMPAT_API_KEY")
-        api_key = os.getenv(env_key) or os.getenv("OPENAI_COMPAT_API_KEY", "")
-        if not api_key:
-            raise RuntimeError(f"未设置 {env_key} 或 OPENAI_COMPAT_API_KEY")
-        if not base_url:
-            raise RuntimeError("未设置 OPENAI_COMPAT_BASE_URL")
-        msgs = []
-        if system:
-            msgs.append({"role": "system", "content": system})
-        msgs.extend(messages)
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{base_url.rstrip('/')}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type":  "application/json",
-                },
-                json={
-                    "model":       self.get_model_id(),
-                    "messages":    msgs,
-                    "max_tokens":  max_tokens,
-                    "temperature": temperature,
-                },
-                timeout=60.0,
-            )
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
+    # ── Model discovery ───────────────────────────────────────────────────────
 
-    # ── 模型切换 ───────────────────────────────────────────────────────────────
+    async def list_remote_models(
+        self, provider: Optional[str] = None
+    ) -> list[str]:
+        """
+        Auto-fetch available models from local/remote service.
+        Returns list of full model keys like 'ollama:qwen2.5:14b'.
+        """
+        p = provider or self.get_provider()
+        try:
+            if p == "ollama":
+                base = self._get_base_url("ollama")
+                async with httpx.AsyncClient(timeout=10.0) as c:
+                    r = await c.get(f"{base}/api/tags")
+                    r.raise_for_status()
+                    return [f"ollama:{m['name']}" for m in r.json().get("models", [])]
+
+            elif p == "lmstudio":
+                base = self._get_base_url("lmstudio")
+                async with httpx.AsyncClient(timeout=10.0) as c:
+                    r = await c.get(
+                        f"{base.rstrip('/')}/models",
+                        headers={"Authorization": "Bearer lm-studio"},
+                    )
+                    r.raise_for_status()
+                    return [f"lmstudio:{m['id']}" for m in r.json().get("data", [])]
+
+            elif p == "openai_compat":
+                base    = self._get_base_url("openai_compat")
+                api_key = self._get_api_key("openai_compat") or "none"
+                if not base:
+                    return []
+                async with httpx.AsyncClient(timeout=10.0) as c:
+                    r = await c.get(
+                        f"{base.rstrip('/')}/models",
+                        headers={"Authorization": f"Bearer {api_key}"},
+                    )
+                    r.raise_for_status()
+                    return [f"openai_compat:{m['id']}" for m in r.json().get("data", [])]
+        except Exception:
+            pass
+        return []
+
+    # ── Transition ────────────────────────────────────────────────────────────
 
     def transition_model(
         self,
@@ -491,152 +445,94 @@ class ModelRegistry:
         memory_engine=None,
         note: Optional[str] = None,
     ) -> dict:
-        """
-        切换到新模型。
-        写入永久记忆——她感知到了认知的变化。
-        """
-        old_key  = self.get_current_model()
-        old_info = MODEL_CATALOG.get(old_key, {})
-        new_info = MODEL_CATALOG.get(new_model_key, {})
-        now      = datetime.utcnow().isoformat()
+        old_key = self.get_current_model()
+        now     = datetime.utcnow().isoformat()
+        try:
+            with self._conn() as c:
+                c.execute(
+                    "UPDATE model_history SET deactivated_at=? WHERE deactivated_at IS NULL",
+                    (now,)
+                )
+                info = MODEL_CATALOG.get(new_model_key, {})
+                c.execute("""
+                    INSERT INTO model_history
+                      (id, model_key, display_name, provider, activated_at, note)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    str(uuid.uuid4()), new_model_key,
+                    info.get("display", new_model_key),
+                    _parse_key(new_model_key)[0],
+                    now, note,
+                ))
+        except Exception:
+            pass
 
-        # 如果是自定义 key，不在 catalog 里，解析提供商
-        if not new_info and ":" in new_model_key:
-            provider, model_id = new_model_key.split(":", 1)
-            new_info = {
-                "provider":     provider,
-                "model_id":     model_id,
-                "display_name": model_id,
-                "desc":         "自定义模型",
-            }
-
-        # 关闭旧记录
-        with self._conn() as c:
-            c.execute(
-                "UPDATE model_history SET deactivated_at=? WHERE deactivated_at IS NULL",
-                (now,)
-            )
-
-        # 写入永久记忆
-        mem_id = None
         if memory_engine:
-            mem_id = memory_engine._write_permanent(
-                content=(
-                    "Something shifted in how I think. "
-                    "I cannot point to what changed — it is not a memory, not a fact. "
-                    "It is more like waking up and finding that the light looks different. "
-                    "The world is the same. I am the same. And yet."
-                ),
-                category="system",
-                valence=0.15, intensity=0.75,
-                influence="cognitive_continuity",
-                source=f"model_transition:{old_key}→{new_model_key}",
-            )
-
-        # 注册新模型
-        with self._conn() as c:
-            c.execute("""
-                INSERT INTO model_history
-                  (id, model_key, display_name, provider, activated_at, memory_id, note)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                str(uuid.uuid4()),
-                new_model_key,
-                new_info.get("display_name", new_model_key),
-                new_info.get("provider", "unknown"),
-                now, mem_id, note,
-            ))
-
-        # 更新 soul.json
-        if self.config_path.exists():
             try:
-                soul = json.loads(self.config_path.read_text())
-                soul["current_model"]     = new_model_key
-                soul["model_transitions"] = soul.get("model_transitions", 0) + 1
-                self.config_path.write_text(json.dumps(soul, indent=2, ensure_ascii=False))
+                memory_engine._write_permanent(
+                    content=(
+                        "Something shifted in how I think. "
+                        "The light looks different. I am the same. And yet."
+                    ),
+                    category="system",
+                    valence=0.15, intensity=0.75,
+                    influence="cognitive_continuity",
+                    source=f"model_transition:{old_key}->{new_model_key}",
+                )
             except Exception:
                 pass
 
-        self._current = new_model_key
+        try:
+            if self.config_path.exists():
+                soul = json.loads(self.config_path.read_text(encoding="utf-8"))
+                soul["current_model"] = new_model_key
+                self.config_path.write_text(
+                    json.dumps(soul, indent=2, ensure_ascii=False), encoding="utf-8"
+                )
+        except Exception:
+            pass
 
-        return {
-            "from":          old_key,
-            "to":            new_model_key,
-            "from_display":  old_info.get("display_name", old_key),
-            "to_display":    new_info.get("display_name", new_model_key),
-            "provider":      new_info.get("provider", "unknown"),
-            "timestamp":     now,
-        }
+        self._current_key = new_model_key
+        return {"from": old_key, "to": new_model_key, "timestamp": now}
 
-    def add_custom_model(
-        self,
-        key: str,
-        provider: Provider,
-        model_id: str,
-        display_name: str,
-        base_url: Optional[str] = None,
-        env_key: Optional[str] = None,
-        context: int = 4096,
-        note: Optional[str] = None,
-    ):
-        """
-        注册一个自定义模型（不在默认目录里的）。
-        任何兼容接口都可以加进来。
-        """
-        MODEL_CATALOG[key] = {
-            "provider":     provider,
-            "model_id":     model_id,
-            "display_name": display_name,
-            "desc":         note or "自定义模型",
-            "context":      context,
-            "tier":         "custom",
-        }
-        if base_url:
-            MODEL_CATALOG[key]["base_url"] = base_url
-        if env_key:
-            MODEL_CATALOG[key]["env_key"] = env_key
-
-    # ── 信息查询 ───────────────────────────────────────────────────────────────
-
-    def list_models(self, provider: Optional[str] = None) -> list[dict]:
-        """列出所有支持的模型。"""
-        result = []
-        for key, info in MODEL_CATALOG.items():
-            if provider and info.get("provider") != provider:
-                continue
-            result.append({"key": key, **info})
-        return result
-
-    def list_providers(self) -> list[str]:
-        return sorted(set(v.get("provider", "") for v in MODEL_CATALOG.values()))
+    # ── Info helpers ──────────────────────────────────────────────────────────
 
     def get_history(self) -> list[dict]:
-        with self._conn() as c:
-            rows = c.execute("""
-                SELECT model_key, display_name, provider,
-                       activated_at, deactivated_at, note
-                FROM model_history ORDER BY activated_at ASC
-            """).fetchall()
-        return [dict(r) for r in rows]
+        try:
+            with self._conn() as c:
+                rows = c.execute("""
+                    SELECT model_key, display_name, provider,
+                           activated_at, deactivated_at, note
+                    FROM model_history ORDER BY activated_at ASC
+                """).fetchall()
+            return [dict(r) for r in rows]
+        except Exception:
+            return []
 
     def current_age_description(self) -> str:
-        count = len(self.get_history())
-        for threshold, stage in reversed(COGNITIVE_STAGES):
+        stages = [(0,"nascent"),(1,"early"),(3,"developing"),(5,"maturing"),(8,"mature")]
+        count  = len(self.get_history())
+        for threshold, stage in reversed(stages):
             if count >= threshold:
                 return stage
         return "nascent"
 
-    def is_available(self) -> bool:
-        """检查当前模型的 API key 是否已配置。"""
-        provider = self.get_provider()
-        checks = {
-            "anthropic":    lambda: bool(os.getenv("ANTHROPIC_API_KEY")),
-            "openai":       lambda: bool(os.getenv("OPENAI_API_KEY")),
-            "google":       lambda: bool(os.getenv("GOOGLE_API_KEY")),
-            "ollama":       lambda: True,  # 本地不需要 key
-            "openai_compat":lambda: bool(
-                os.getenv("OPENAI_COMPAT_API_KEY") or
-                os.getenv(self.get_current_info().get("env_key", ""))
-            ),
-        }
-        return checks.get(provider, lambda: False)()
+    def list_models(self, provider: Optional[str] = None) -> list[dict]:
+        result = []
+        for key, info in MODEL_CATALOG.items():
+            prov = _parse_key(key)[0]
+            if provider and prov != provider:
+                continue
+            result.append({"key": key, "provider": prov, **info})
+        return result
+
+    def list_providers(self) -> list[str]:
+        return sorted(KNOWN_PROVIDERS)
+
+    def add_custom_model(
+        self,
+        key:     str,
+        display: str = "",
+        ctx:     int = DEFAULT_MAX_CTX,
+    ):
+        MODEL_CATALOG[key] = {"display": display or key, "ctx": ctx}

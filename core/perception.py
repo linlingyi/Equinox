@@ -34,6 +34,24 @@ from typing import Optional
 import httpx
 
 
+async def _llm_complete(
+    messages: list,
+    max_tokens: int,
+    current_model: str,
+    system: str = None,
+) -> str:
+    """Universal LLM completion — routes through model_registry."""
+    from core.model_registry import ModelRegistry
+    reg = ModelRegistry()
+    reg._current = current_model
+    return await reg.complete(
+        messages=messages,
+        system=system,
+        max_tokens=max_tokens,
+    )
+
+
+
 # Equinox's "home" location — Tokyo, where she was born
 # (This is configurable in soul.json)
 DEFAULT_HOME_LAT  = 35.6762
@@ -165,40 +183,14 @@ async def generate_perception_reaction(
     current_model: str,
 ) -> Optional[str]:
     """Ask Equinox how she reacts to a perception."""
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        return None
-
-    now = datetime.now()
-    hour = now.hour
-    if 5 <= hour < 12:   local_time = "morning"
-    elif 12 <= hour < 17: local_time = "afternoon"
-    elif 17 <= hour < 21: local_time = "evening"
-    else:                  local_time = "night"
-
-    prompt = PERCEPTION_REACTION_PROMPT.format(
-        perception_summary=perception_summary,
-        emotion=emotion_label,
-        local_time=local_time,
-    )
-
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model":      current_model,
-                    "max_tokens": 120,
-                    "messages":   [{"role": "user", "content": prompt}],
-                },
-                timeout=15.0,
-            )
-            resp.raise_for_status()
-            return resp.json()["content"][0]["text"].strip()
+        from core.model_registry import ModelRegistry as _MR
+        _reg = _MR()
+        _reg._current = current_model
+        result = await _reg.complete(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=120,
+        )
+        if result: result = result.strip()
     except Exception:
         return None

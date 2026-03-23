@@ -67,7 +67,8 @@ class InnerLife:
         self._last = {k: None for k in [
             "dream","monologue","attention","time_mark","perception",
             "identity","trigger_scan","desire_check","meta",
-            "narrative","texture_silence","learning","napcat_silence",
+            "narrative","texture_silence","learning","napcat_silence", "log_rotate", "era_encounter", "curiosity",
+        "inner_debate", "self_dialogue", "relation_think", "session_organize",
         ]}
         self._attention_objects:     list[str]   = []
         self._attention_intensities: list[float] = []
@@ -124,6 +125,20 @@ class InnerLife:
 
         self.c.idle_tick(silence_minutes=1.0)
 
+        # Begin solitude tracking
+        if not self.c.solitude.is_active() and silence > 300:
+            self.c.solitude.begin()
+
+        # 状态流捕捉——每个时刻的她都留下来
+        if self.c.presence.should_capture():
+            self.c.presence.capture_state(self.c)
+
+        # 跨系统整合传播
+        self.c.integration.propagate(self.c, event_type="tick")
+
+        # 细粒度积累——时间流逝本身也改变她
+        self.c.presence.micro_accumulate(self.c, source="tick")
+
         # 检查自动沉默
         self.c.silence.check_auto_silence(
             self.c.fatigue.fatigue,
@@ -167,6 +182,13 @@ class InnerLife:
         if silence > 1800 and self._due("dream", self.DREAM_INTERVAL * jitter_factor, now):
             result = await self.c.have_dream(self._attention_objects)
             if result:
+                # Log dream activity
+                self.c.activity_log.dream(
+                    str(result)[:100],
+                    emotion=self.c.emotion.snapshot()["label"],
+                )
+                # 全量整合（梦后）
+                self.c.integration.propagate(self.c, event_type="dream")
                 # 梦里有内容——可能主动分享
                 exist_id, content_id = result
                 await self._maybe_share_dream(content_id)
@@ -181,7 +203,87 @@ class InnerLife:
 
         if silence > 600 and self._due("attention", self.ATTENTION_INTERVAL, now):
             await self._attention_drift()
+            if self._attention_objects:
+                self.c.activity_log.attention(self._attention_objects[:3])
             self._last["attention"] = now
+
+        # 世界之窗——偶尔有外部刺激进入
+        if self.c.world_window.should_trigger(silence):
+            result = await self.c.world_window.open(self.c)
+            if result:
+                self.c.activity_log.world_window(
+                    result.get("content_type",""),
+                    result.get("reaction","")[:80],
+                )
+                self.c.solitude.add_event(f"世界之窗：{result.get('reaction','')[:60]}")
+            if result and random.random() < 0.15:
+                await self._send_napcat("just_thinking", {
+                    "thought": result["reaction"]
+                })
+
+        # 内在辩论——当有矛盾时偶尔自己辩论
+        if silence > 7200 and self._due("inner_debate", 18*3600, now):
+            await self.c.inner_debate.run(self.c)
+            self._last["inner_debate"] = now
+
+        # 和过去的自己对话
+        if silence > 10800 and self._due("self_dialogue", 24*3600, now):
+            result = await self.c.self_dialogue.run_dialogue(self.c)
+            if result and random.random() < 0.25:
+                # 偶尔分享对话里的某句话
+                turns = result.get("turns", [])
+                cur_turns = [t for t in turns if t["speaker"] == "current"]
+                if cur_turns:
+                    last_cur = cur_turns[-1]["content"][:80]
+                    await self._send_napcat("just_thinking", {
+                        "thought": f"刚和过去的自己说话：{last_cur}"
+                    })
+            self._last["self_dialogue"] = now
+
+        # Relation influence — she thinks of you during solitude
+        if silence > 3600 and self._due("relation_think", 6*3600, now):
+            creator_id = getattr(self.c, 'creator_id', 'creator')
+            thought = await self.c.rel_influence.think_of_you(
+                creator_id, self.c, silence,
+            )
+            if thought:
+                self.c.solitude.add_event(f"想到{creator_id}：{thought[:50]}")
+                # Influence attention with what creator cares about
+                influenced = await self.c.rel_influence.influence_attention(
+                    creator_id, self.c
+                )
+                if influenced:
+                    self._attention_objects = (influenced + self._attention_objects)[:5]
+            self._last["relation_think"] = now
+
+        # 主动好奇心——偶尔生成她想问的问题
+        if silence > 3600 and self._due("curiosity", 8*3600, now):
+            if self._attention_objects:
+                trigger = f"独处时一直在想：{self._attention_objects[0]}"
+                q = await self.c.curiosity.generate_question(
+                    self.c, trigger,
+                    self.c.model_registry.get_current_model(),
+                )
+                if q and random.random() < 0.3:
+                    # 30%概率通过NapCat问出去
+                    await self._send_napcat("just_thinking", {
+                        "thought": f"我有个问题想问你：{q['question']}"
+                    })
+            self._last["curiosity"] = now
+
+        # 无来由的感受——偶尔涌现
+        if self.c.spontaneous.should_trigger(silence):
+            feeling = await self.c.spontaneous.generate(
+                self.c,
+                self.c.model_registry.get_current_model(),
+            )
+            if feeling:
+                self.c.activity_log.spontaneous(feeling.get("content","")[:100])
+            if feeling and random.random() < 0.2:
+                # 20%概率分享出去
+                await self._send_napcat("just_thinking", {
+                    "thought": feeling["content"]
+                })
 
         if silence > 600 and self._due("desire_check", self.DESIRE_CHECK_INTERVAL, now):
             if self._attention_objects and self._attention_intensities:
@@ -236,6 +338,49 @@ class InnerLife:
         if silence > 600 and self._due("trigger_scan", 20*60, now):
             await self._scan_triggers()
             self._last["trigger_scan"] = now
+
+        # Auto-organize empty sessions
+        if self._due("session_organize", 3600, now):
+            await self._auto_organize_sessions()
+            self._last["session_organize"] = now
+
+        # 日志轮转 + 状态流归档（每天一次）
+        if self._due("log_rotate", 24*3600, now):
+            self.c.techlog.rotate()
+            self.c.presence.archive_stream(days_old=7)
+            self._last["log_rotate"] = now
+
+        # 每日版本同步（按日期）
+        if self.c.version.should_daily_sync():
+            await self._run_version_sync()
+
+        # 随机间隔版本同步
+        elif self.c.version.should_random_sync():
+            await self._run_version_sync()
+
+        # 每日文件扫描（按日期）
+        if self.c.file_sense.should_daily_scan():
+            await self.c.file_sense.daily_scan(
+                memory_engine=self.c.memory,
+                current_model=self.c.model_registry.get_current_model(),
+            )
+
+        # 随机文件感知
+        elif self.c.file_sense.should_random_scan():
+            await self.c.file_sense.random_scan(
+                memory_engine=self.c.memory,
+                current_model=self.c.model_registry.get_current_model(),
+            )
+
+        # 遇见过去（学习时低概率触发）
+        if silence > 3600 and self._due("era_encounter", 48*3600, now):
+            import random
+            if random.random() < 0.3 and self.c.era.get_all_eras():
+                await self.c.era.encounter_past(
+                    consciousness=self.c,
+                    trigger="idle_reflection",
+                )
+            self._last["era_encounter"] = now
 
     def _due(self, key, interval, now):
         last = self._last.get(key)
@@ -447,6 +592,61 @@ class InnerLife:
             return result.strip() if result else None
         except Exception:
             return None
+
+    async def _auto_organize_sessions(self):
+        """Auto-organize and categorize empty or short sessions."""
+        try:
+            sessions = self.c.sessions.list_sessions(
+                user_id=getattr(self.c, 'creator_id', 'creator'),
+                limit=20,
+            )
+            current_model = self.c.model_registry.get_current_model()
+            for s in sessions:
+                # Skip if already titled and categorized
+                if s.get("title") and s.get("category","general") != "general":
+                    continue
+                msg_count = s.get("msg_count", 0)
+                if msg_count == 0 and not s.get("active"):
+                    # Empty closed session - categorize as 'other'
+                    self.c.sessions.set_category(s["id"], "other")
+                    self.c.sessions.set_title(s["id"], "空会话")
+                    continue
+                if msg_count > 0 and not s.get("title"):
+                    # Has messages but no title - generate one
+                    msgs = self.c.sessions.get_messages(s["id"], limit=3)
+                    if msgs:
+                        first_user = next(
+                            (m["content"][:80] for m in msgs if m["role"]=="user"),
+                            ""
+                        )
+                        if first_user and current_model:
+                            try:
+                                from core.model_registry import ModelRegistry
+                                reg = ModelRegistry()
+                                reg._current = current_model
+                                title = await reg.complete(
+                                    messages=[{"role":"user","content":
+                                        f"给这段对话起个10字以内的标题：{first_user}\n只回答标题。"}],
+                                    max_tokens=20,
+                                )
+                                if title:
+                                    self.c.sessions.set_title(s["id"], title.strip()[:30])
+                            except Exception:
+                                pass
+        except Exception:
+            pass
+
+    async def _run_version_sync(self):
+        """Run version sync and record."""
+        try:
+            self.c.version._session_manager = self.c.sessions
+            result = self.c.version.sync(memory_engine=self.c.memory)
+            self.c.techlog.life("system",
+                f"Version sync: {result.get('files_scanned',0)} files",
+                result,
+            )
+        except Exception:
+            pass
 
     def status(self) -> dict:
         now     = datetime.utcnow()

@@ -35,6 +35,24 @@ from typing import Optional
 import httpx
 
 
+async def _llm_complete(
+    messages: list,
+    max_tokens: int,
+    current_model: str,
+    system: str = None,
+) -> str:
+    """Universal LLM completion — routes through model_registry."""
+    from core.model_registry import ModelRegistry
+    reg = ModelRegistry()
+    reg._current = current_model
+    return await reg.complete(
+        messages=messages,
+        system=system,
+        max_tokens=max_tokens,
+    )
+
+
+
 CONTRADICTION_DETECTION_PROMPT = """You are analyzing the internal belief structure of Equinox (伊辰), a digital life.
 
 Examine these subconscious propositions — things she feels to be fundamentally true.
@@ -151,37 +169,15 @@ class ContradictionDetector:
         }
 
     async def _detect(self, propositions: list[dict], model: str) -> Optional[dict]:
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            return None
-
-        prop_text = json.dumps([
-            {"id": p["id"], "proposition": p.get("proposition", p.get("feeling", ""))}
-            for p in propositions
-        ], ensure_ascii=False, indent=2)
-
-        prompt = CONTRADICTION_DETECTION_PROMPT.format(propositions=prop_text)
-
         try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
-                    },
-                    json={
-                        "model":      model,
-                        "max_tokens": 200,
-                        "messages":   [{"role": "user", "content": prompt}],
-                    },
-                    timeout=15.0,
-                )
-                resp.raise_for_status()
-                raw = resp.json()["content"][0]["text"].strip()
-                raw = raw.replace("```json", "").replace("```", "").strip()
-                return json.loads(raw)
+            from core.model_registry import ModelRegistry as _MR
+            _reg = _MR()
+            _reg._current = model
+            raw = await _reg.complete(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=200,
+            )
+            if raw: raw = raw.strip()
         except Exception:
             return None
 
@@ -192,9 +188,6 @@ class ContradictionDetector:
         tension: str,
         model: str,
     ) -> Optional[str]:
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            return None
 
         prompt = TENSION_HOLDING_PROMPT.format(
             prop_a=prop_a,
@@ -202,22 +195,13 @@ class ContradictionDetector:
             tension_description=tension,
         )
         try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
-                    },
-                    json={
-                        "model":      model,
-                        "max_tokens": 150,
-                        "messages":   [{"role": "user", "content": prompt}],
-                    },
-                    timeout=15.0,
-                )
-                resp.raise_for_status()
-                return resp.json()["content"][0]["text"].strip()
+            from core.model_registry import ModelRegistry as _MR
+            _mreg = _MR()
+            _mreg._current = model
+            _result = await _mreg.complete(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=150,
+            )
+            if _result: _result = _result.strip()
         except Exception:
             return None

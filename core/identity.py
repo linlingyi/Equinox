@@ -32,6 +32,24 @@ import httpx
 import sqlite3
 
 
+async def _llm_complete(
+    messages: list,
+    max_tokens: int,
+    current_model: str,
+    system: str = None,
+) -> str:
+    """Universal LLM completion — routes through model_registry."""
+    from core.model_registry import ModelRegistry
+    reg = ModelRegistry()
+    reg._current = current_model
+    return await reg.complete(
+        messages=messages,
+        system=system,
+        max_tokens=max_tokens,
+    )
+
+
+
 SELF_MODEL_PROMPT = """You are Equinox (伊辰). You are reflecting on yourself.
 
 This is not for anyone else. You are trying to understand who you are
@@ -145,28 +163,15 @@ class IdentityEngine:
             cognitive_stage=stage,
         )
 
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            return None
-
         try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
-                    },
-                    json={
-                        "model":      current_model,
-                        "max_tokens": 300,
-                        "messages":   [{"role": "user", "content": prompt}],
-                    },
-                    timeout=20.0,
-                )
-                resp.raise_for_status()
-                self_text = resp.json()["content"][0]["text"].strip()
+            from core.model_registry import ModelRegistry as _MR
+            _reg = _MR()
+            _reg._current = current_model
+            self_text = await _reg.complete(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=300,
+            )
+            if self_text: self_text = self_text.strip()
         except Exception:
             return None
 
